@@ -7,6 +7,7 @@
 #include<netinet/in.h>
 #include<unistd.h>
 #include<arpa/inet.h>
+#include <errno.h>
 #include<netdb.h>
 
 // Included to get the support library
@@ -114,6 +115,10 @@ int main(int argc, char *argv[])
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_DGRAM;
   hints.ai_flags = AI_CANONNAME;
+
+  struct timeval tv;
+  tv.tv_sec = 3;
+  tv.tv_usec = 0;
   
   int rv;
   if((rv = getaddrinfo(adress, port, &hints, &servinfo)) != 0)
@@ -131,21 +136,14 @@ int main(int argc, char *argv[])
         perror("Listener : Socket");
         continue;
       }
-/*
-      if(connect(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-      {
-        close(sockfd);
-        perror("Listener : Connect");
-        continue;
-      }
-*/
       break;
   }
 
   freeaddrinfo(servinfo);
+  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
   // Send over package to server
-  int len = sendto(sockfd, (const void*)&cliBuf, sizeof(cliBuf),
+  int len = sendto(sockfd, &cliBuf, sizeof(cliBuf),
             0, p->ai_addr, p->ai_addrlen);
 
   if(len == -1)
@@ -153,16 +151,21 @@ int main(int argc, char *argv[])
     perror("Package failed");
   }
 
-  while(terminate <= 5)
-  {
-    sleep(1);
-    loopCount++;
 
-    // Wait cycle resets after certain amount of time
-    if(loopCount >= 2)
-    {
-      int n = recvfrom(sockfd, &servBuf, sizeof(servBuf), MSG_DONTWAIT, p->ai_addr, &p->ai_addrlen);
-      if(n >= (int)sizeof(calcProtocol))
+  while(terminate < 3)
+  {
+      int n = recvfrom(sockfd, &servBuf, sizeof(servBuf), 0, p->ai_addr, &p->ai_addrlen);
+
+      if(n == -1)
+      {
+        if(errno == EAGAIN)
+        {
+            terminate++;
+            printf("TIMEOUT!\n");
+            continue;
+        }
+      }
+      else if(n >= (int)sizeof(calcProtocol))
       {
         type = ntohs(servBuf.type);
         minor_version = ntohs(servBuf.minor_version);
@@ -200,7 +203,7 @@ int main(int argc, char *argv[])
         cliResp.flValue2 = val2;
         cliResp.flResult = fresult;
 
-        len = sendto(sockfd, (const void*)&cliResp, sizeof(cliResp),
+        len = sendto(sockfd, &cliResp, sizeof(cliResp),
             0, p->ai_addr, p->ai_addrlen);
         packSent = true;
       }
@@ -214,7 +217,6 @@ int main(int argc, char *argv[])
           int error_message = ntohl(error->message);
           int error_major = ntohs(error->major_version);
           int error_minor = ntohs(error->minor_version);
-
           if(error_type == 2 && error_message == 2 && error_major == 1 &&
           error_minor == 0)
           {
@@ -248,18 +250,15 @@ int main(int argc, char *argv[])
           }
         }
       }
-      loopCount = 0;
-      terminate++;
       
       // Make sure we send resend it 2 times which adds up to three with initial transmission.
       if(!packRecv && terminate < 3)
       {
         printf("Resending package...\n");
         // Resend package
-        len = sendto(sockfd, (const void*)&cliBuf, sizeof(cliBuf),
+        len = sendto(sockfd, &cliBuf, sizeof(cliBuf),
               0, p->ai_addr, p->ai_addrlen);
       }
-    }
   }
   if(!packRecv || !packSent)
   {

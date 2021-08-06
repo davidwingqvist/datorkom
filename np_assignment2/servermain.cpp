@@ -16,7 +16,7 @@
 #include <vector>
 #include <chrono>
 
-// Included to get the support library
+// Included to get the support library Client
 #include <calcLib.h>
 
 #include "protocol.h"
@@ -208,7 +208,6 @@ bool is_in_system(sockaddr_in* check)
     for(int i = 0; i < (int)timers.size(); i++)
     {
       int second = timers[i];
-      int res = first - second;
       if(first - second >= 10)
       {
         if(timers[i] != -1)
@@ -229,9 +228,12 @@ int main(int argc, char *argv[]){
     printf("No more/less than 1 argument needs to be present. Retry.\n");
     exit(0);
   }
+
+  initCalcLib();
   /* Do more magic */
   calcProtocol servBuf;
-  sockaddr_in servaddr = {0};
+  sockaddr_in servaddr;
+  memset(&servaddr, 0, sizeof(sockaddr_in));
   struct addrinfo hints, *servinfo, *p;
 
   // Divide string into two parts 
@@ -243,7 +245,6 @@ int main(int argc, char *argv[]){
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_DGRAM;
-  hints.ai_flags = AI_CANONNAME;
   
   int rv;
   if((rv = getaddrinfo(adress, port, &hints, &servinfo)) != 0)
@@ -274,8 +275,8 @@ int main(int argc, char *argv[]){
 
   freeaddrinfo(servinfo);
 
-  socklen_t len = 0;
-
+  
+  socklen_t len = sizeof servaddr;
   /* 
      Prepare to setup a reoccurring event every 10s. If it_interval, or it_value is omitted, it will be a single alarm 10s after it has been set. 
   */
@@ -291,8 +292,9 @@ int main(int argc, char *argv[]){
   
   while(1)
   {
+    
     // Check if anything new has arrived
-    int n = recvfrom(sockfd, &servBuf, sizeof(servBuf), MSG_DONTWAIT, (struct sockaddr*)&servaddr, &len);
+    int n = recvfrom(sockfd, &servBuf, sizeof(servBuf), 0, (struct sockaddr*)&servaddr, &len);
 
     if(n == sizeof(calcMessage))
     {
@@ -373,14 +375,7 @@ int main(int argc, char *argv[]){
       if(is_in_system(newProt.id, spot))
       {
         special_exception++;
-        if(spot != 0)
-        {
-          ip = spot;
-        }
-        else
-        {
-          ip = 1;
-        }
+        ip = spot;
 
         if(timers[spot] > 0)
         {
