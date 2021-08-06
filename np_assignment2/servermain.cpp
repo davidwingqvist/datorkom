@@ -382,7 +382,58 @@ int main(int argc, char *argv[]){
           ip = 1;
         }
 
-        if(special_exception % 9 == 0)
+        if(timers[spot] > 0)
+        {
+          // Is validated, check response, send back result
+          calcMessage resp;
+          resp.message = htonl(2); // Pessimistic start, we assume they respond incorrectly.
+          resp.type = htons(2);
+          resp.protocol = htons(17);
+          resp.major_version = htons(1);
+          resp.minor_version = htons(0);
+        
+          if(newProt.arith >= 5)
+          {
+            if(newProt.flResult == storage[spot].flResult)
+            {
+              printf("Value 1: %8.8g\n", storage[spot].flValue1);
+              printf("Value 2: %8.8g\n", storage[spot].flValue2);
+              printf("Result: %8.8g\n", storage[spot].flResult);
+              resp.message = htonl(1);
+              printf("Float response was correct. %d\n", spot);
+            }
+          }
+          else
+          {
+            if(newProt.inResult == (int)ntohl(storage[spot].inResult))
+            {
+              resp.message = htonl(1);
+              printf("Value 1: %d\n", (int)ntohl(storage[spot].inValue1));
+              printf("Value 2: %d\n", (int)ntohl(storage[spot].inValue2));
+              printf("Result: %d\n", (int)ntohl(storage[spot].inResult));
+              printf("Integer response was correct. %d\n", spot);
+            }
+          }
+          int send = sendto(sockfd, (const void*)&resp, sizeof(resp),
+            0, (struct sockaddr *)&addresses[ip], sizeof(addresses[ip]));
+
+          if(send == -1)
+          {
+            perror("Error : Send confirmation");
+          }
+          else
+          {
+            current_pos--;
+          }
+
+          if(current_pos <= 0)
+          {
+            // This is to empty storage however might lead to unanswered calls from clients.
+            //empty_storage();
+          }
+          continue;
+        }
+        else if(special_exception > 0) // Special exception for some clients.
         {
           ip = special_exception;
           spot = special_exception;
@@ -437,58 +488,6 @@ int main(int argc, char *argv[]){
           }
 
           continue;
-          }
-        }
-        else if(timers[spot] > 0)
-        {
-          // Is validated, check response, send back result
-          calcMessage resp;
-          resp.message = htonl(2); // Pessimistic start, we assume they respond incorrectly.
-          resp.type = htons(2);
-          resp.protocol = htons(17);
-          resp.major_version = htons(1);
-          resp.minor_version = htons(0);
-        
-          if(newProt.arith >= 5)
-          {
-            if(newProt.flResult == storage[spot].flResult)
-            {
-              printf("Value 1: %8.8g\n", storage[spot].flValue1);
-              printf("Value 2: %8.8g\n", storage[spot].flValue2);
-              printf("Result: %8.8g\n", storage[spot].flResult);
-              resp.message = htonl(1);
-              printf("Float response was correct. %d\n", spot);
-            }
-          }
-          else
-          {
-            if(newProt.inResult == (int)ntohl(storage[spot].inResult))
-            {
-              resp.message = htonl(1);
-              printf("Value 1: %d\n", (int)ntohl(storage[spot].inValue1));
-              printf("Value 2: %d\n", (int)ntohl(storage[spot].inValue2));
-              printf("Result: %d\n", (int)ntohl(storage[spot].inResult));
-              printf("Integer response was correct. %d\n", spot);
-            }
-          }
-          int send = sendto(sockfd, (const void*)&resp, sizeof(resp),
-            0, (struct sockaddr *)&addresses[ip], sizeof(addresses[ip]));
-
-          if(send == -1)
-          {
-            perror("Error : Send confirmation");
-          }
-          else
-          {
-            current_pos--;
-          }
-
-          if(current_pos <= 0)
-          {
-            // This is to empty storage however might lead to unanswered calls from clients.
-            //empty_storage();
-          }
-          continue;
         }
         else
         {
@@ -504,6 +503,8 @@ int main(int argc, char *argv[]){
           sendto(sockfd, (const void*)&error, sizeof(error),
             0, (const struct sockaddr *)&addresses[ip], sizeof(addresses[ip]));
         }
+      }
+        
       }
       else
       {
