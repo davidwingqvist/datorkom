@@ -226,10 +226,16 @@ int main(int argc, char *argv[])
         if(packSent)
         {
           calcMessage* response = (calcMessage*)&servBuf;
+          calcProtocol* response2 = (calcProtocol*)&servBuf;
           int resp_message = ntohl(response->message);
           // Correct answer
           if(resp_message == 1)
           {
+            printf("(server)Value 1: %d\n", htonl(response2->inValue1));
+            printf("(server)Value 2: %d\n", htonl(response2->inValue2));
+
+            printf("(server)Float Value 1: %8.8g\n", response2->flValue1);
+            printf("(server)Float Value 2: %8.8g\n", response2->flValue2);
             printf("(Server)OK\n");
             close(sockfd);
             exit(0);
