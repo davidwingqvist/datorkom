@@ -29,7 +29,7 @@ int terminate_loop=0;
 // Store information
 // Public for the purpose of ease of use with certain functions
 vector<calcProtocol> storage;
-vector<sockaddr> addresses;
+vector<sockaddr_in> addresses;
 vector<int> timers;
 vector<timeval> tim;
 int current_pos = 0;
@@ -177,21 +177,21 @@ void create_package(calcProtocol &calc)
 }
 
 // Check if an address is already inside the database
-bool is_in_system(sockaddr check)
+bool is_in_system(sockaddr_in* check)
 {
   char compare[20] = {0};
-  inet_ntop(check.sa_family, &check, (char*)compare, INET6_ADDRSTRLEN);
+  inet_ntop(check->sin_family, check, (char*)compare, INET6_ADDRSTRLEN);
   for(int i = 0; i < (int)addresses.size(); i++)
   {
     char in_store[20] = {1}; 
-    inet_ntop(addresses[i].sa_family, &addresses[i], (char*)in_store, INET_ADDRSTRLEN);
+    inet_ntop(addresses[i].sin_family, &addresses[i], (char*)in_store, INET_ADDRSTRLEN);
     if(strstr(compare, in_store) != NULL)
     {
       return true;
     }
   }
   // Add address to storage
-  addresses.push_back(check);
+  addresses.push_back(*check);
   return false; // Address was not in system
 }
 
@@ -231,7 +231,7 @@ int main(int argc, char *argv[]){
   }
   /* Do more magic */
   calcProtocol servBuf;
-  sockaddr servaddr = {0};
+  sockaddr_in servaddr = {0};
   struct addrinfo hints, *servinfo, *p;
 
   // Divide string into two parts 
@@ -292,7 +292,7 @@ int main(int argc, char *argv[]){
   while(1)
   {
     // Check if anything new has arrived
-    int n = recvfrom(sockfd, &servBuf, sizeof(servBuf), MSG_DONTWAIT, &servaddr, &len);
+    int n = recvfrom(sockfd, &servBuf, sizeof(servBuf), MSG_DONTWAIT, (struct sockaddr*)&servaddr, &len);
 
     if(n == sizeof(calcMessage))
     {
@@ -306,13 +306,13 @@ int main(int argc, char *argv[]){
       if(type == 22 && protocol == 17 && major == 1 && minor == 0)
       {
         // Check if sender is already in system
-        if(!is_in_system(servaddr))
+        if(!is_in_system(&servaddr))
         {
           printf("New Client.\n");
           // Create a new package
           calcProtocol newPack;
           create_package(newPack);
-          int send = sendto(sockfd, (const void*)&newPack, sizeof(newPack),
+          int send = sendto(sockfd, &newPack, sizeof(newPack),
             0, (struct sockaddr *)&servaddr, sizeof(servaddr));
 
           if(send == -1)
@@ -343,7 +343,7 @@ int main(int argc, char *argv[]){
         error.major_version = htons(1);
         error.minor_version = htons(0);
 
-        int send = sendto(sockfd, (const void*)&error, sizeof(error),
+        int send = sendto(sockfd, &error, sizeof(error),
             0, (struct sockaddr *)&servaddr, sizeof(servaddr));
 
         if (send == -1)
@@ -414,7 +414,7 @@ int main(int argc, char *argv[]){
               printf("Integer response was correct. %d\n", spot);
             }
           }
-          int send = sendto(sockfd, (const void*)&resp, sizeof(resp),
+          int send = sendto(sockfd, &resp, sizeof(resp),
             0, (struct sockaddr *)&addresses[ip], sizeof(addresses[ip]));
 
           if(send == -1)
@@ -469,7 +469,7 @@ int main(int argc, char *argv[]){
               printf("Integer response was correct. %d\n", spot);
             }
           }
-          int send = sendto(sockfd, (const void*)&resp, sizeof(resp),
+          int send = sendto(sockfd, &resp, sizeof(resp),
             0, (struct sockaddr *)&addresses[ip], sizeof(addresses[ip]));
 
           if(send == -1)
@@ -500,7 +500,7 @@ int main(int argc, char *argv[]){
           error.major_version = htons(1);
           error.minor_version = htons(0);
 
-          sendto(sockfd, (const void*)&error, sizeof(error),
+          sendto(sockfd, &error, sizeof(error),
             0, (const struct sockaddr *)&addresses[ip], sizeof(addresses[ip]));
         }
       }
@@ -516,7 +516,7 @@ int main(int argc, char *argv[]){
         error.major_version = htons(1);
         error.minor_version = htons(0);
 
-        int send = sendto(sockfd, (const void*)&error, sizeof(error),
+        int send = sendto(sockfd, &error, sizeof(error),
           0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
         if(send == -1)
