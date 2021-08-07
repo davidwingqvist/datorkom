@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
       break;
   }
 
-  freeaddrinfo(servinfo);
+  //freeaddrinfo(servinfo);
   setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
   // Send over package to server
@@ -267,6 +267,8 @@ int main(int argc, char *argv[])
   }
   else
     printf("End of session.\n");
+  
+  freeaddrinfo(servinfo);
   close(sockfd);
   exit(0);
 }
