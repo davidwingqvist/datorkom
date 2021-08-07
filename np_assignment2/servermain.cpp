@@ -291,7 +291,7 @@ srand(time(NULL));
       break;
   }
 
-  freeaddrinfo(servinfo);
+  //freeaddrinfo(servinfo);
 
   
   socklen_t len = sizeof servaddr;
