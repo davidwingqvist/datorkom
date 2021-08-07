@@ -15,6 +15,8 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
+#include <iostream>
+#include <ctime>
 
 // Included to get the support library Client
 #include <calcLib.h>
@@ -30,6 +32,7 @@ int terminate_loop=0;
 // Public for the purpose of ease of use with certain functions
 vector<calcProtocol> storage;
 vector<sockaddr_in> addresses;
+vector<char*> addr;
 vector<int> timers;
 vector<timeval> tim;
 int current_pos = 0;
@@ -97,13 +100,15 @@ void create_package(calcProtocol &calc)
   calc.type = htons(1);
   calc.major_version = htons(1);
   calc.minor_version = htons(0);
-  calc.id = htonl(randomInt());
+  calc.id = htonl(randomInt() * randomInt() * randomInt() * randomInt() * randomInt() * randomInt());
   calc.flValue1 = 0.0;
   calc.flValue2 = 0.0;
   calc.inValue1 = htonl(0);
   calc.inValue2 = htonl(0);
 
   char* type_arith = randomType();
+
+  cout << "Type: " << type_arith << "\n";
   if(strcmp("fsub", type_arith) == 0)
   {
     calc.arith = 6;
@@ -130,7 +135,13 @@ void create_package(calcProtocol &calc)
     calc.arith = 8;
     calc.flValue1 = randomFloat();
     calc.flValue2 = randomFloat();
-    calc.flResult = calc.flValue1 / calc.flValue2;
+
+	if (calc.flValue2 != 0)
+	{
+		calc.flResult = calc.flValue1 / calc.flValue2;
+	}
+	else
+		calc.flResult = 0;
   }
   else if(strcmp("add", type_arith) == 0)
   {
@@ -167,7 +178,11 @@ void create_package(calcProtocol &calc)
     calc.arith = 4;
     calc.inValue1 = randomInt();
     calc.inValue2 = randomInt();
-    calc.inResult = htonl((calc.inValue1 / calc.inValue2));
+
+	if (calc.inValue2 != 0)
+		calc.inResult = htonl((calc.inValue1 / calc.inValue2));
+	else
+		calc.inResult = htonl(0);
 
     calc.inValue1 = htonl(calc.inValue1);
     calc.inValue2 = htonl(calc.inValue2);
@@ -187,9 +202,11 @@ bool is_in_system(sockaddr_in* check)
     inet_ntop(addresses[i].sin_family, &addresses[i], (char*)in_store, INET_ADDRSTRLEN);
     if(strstr(compare, in_store) != NULL)
     {
-      return true;
+		return true;
     }
   }
+
+  addr.push_back(compare);
   // Add address to storage
   addresses.push_back(*check);
   return false; // Address was not in system
@@ -223,6 +240,7 @@ bool is_in_system(sockaddr_in* check)
 
 int main(int argc, char *argv[]){
   
+srand(time(NULL));
   if(argc != 2)
   {
     printf("No more/less than 1 argument needs to be present. Retry.\n");
@@ -295,9 +313,11 @@ int main(int argc, char *argv[]){
     
     // Check if anything new has arrived
     int n = recvfrom(sockfd, &servBuf, sizeof(servBuf), 0, (struct sockaddr*)&servaddr, &len);
+	printf("%d\n", n);
 
     if(n == sizeof(calcMessage))
     {
+		printf("calcMessage\n");
       // Type-cast calcProtocl to calcMessage
       calcMessage* message = (calcMessage*)&servBuf;
       int type = ntohs(message->type);
@@ -356,6 +376,7 @@ int main(int argc, char *argv[]){
     }
     else if(n == sizeof(calcProtocol))
     {
+		printf("calcProtocol\n");
       // Pack up reponse
       calcProtocol newProt;
       newProt.type = ntohs(servBuf.type);
@@ -374,6 +395,7 @@ int main(int argc, char *argv[]){
       int ip = 0;
       if(is_in_system(newProt.id, spot))
       {
+		std::cout << "Spot: " << spot << "\n";
         special_exception++;
         ip = spot;
 
@@ -391,11 +413,11 @@ int main(int argc, char *argv[]){
           {
             if(newProt.flResult == storage[spot].flResult)
             {
-              printf("Value 1: %8.8g\n", storage[spot].flValue1);
-              printf("Value 2: %8.8g\n", storage[spot].flValue2);
-              printf("Result: %8.8g\n", storage[spot].flResult);
+              //printf("Value 1: %8.8g\n", storage[spot].flValue1);
+              //printf("Value 2: %8.8g\n", storage[spot].flValue2);
+              //printf("Result: %8.8g\n", storage[spot].flResult);
               resp.message = htonl(1);
-              printf("Float response was correct. %d\n", spot);
+              //printf("Float response was correct. %d\n", spot);
             }
           }
           else
@@ -403,15 +425,22 @@ int main(int argc, char *argv[]){
             if(newProt.inResult == (int)ntohl(storage[spot].inResult))
             {
               resp.message = htonl(1);
-              printf("Value 1: %d\n", (int)ntohl(storage[spot].inValue1));
-              printf("Value 2: %d\n", (int)ntohl(storage[spot].inValue2));
-              printf("Result: %d\n", (int)ntohl(storage[spot].inResult));
-              printf("Integer response was correct. %d\n", spot);
+              //printf("Value 1: %d\n", (int)ntohl(storage[spot].inValue1));
+              //printf("Value 2: %d\n", (int)ntohl(storage[spot].inValue2));
+              //printf("Result: %d\n", (int)ntohl(storage[spot].inResult));
+             //printf("Integer response was correct. %d\n", spot);
             }
           }
+
+		  char ips[20];
+		  inet_ntop(addresses[ip].sin_family, (struct sockaddr_in*)& addresses[ip], ips, sizeof(addresses[ip]));
+		  //std::cout << "IP: " << ips << "\n";
+
           int send = sendto(sockfd, &resp, sizeof(resp),
             0, (struct sockaddr *)&addresses[ip], sizeof(addresses[ip]));
 
+		  std::cout << "Answer from client was correct.\n";
+		 
           if(send == -1)
           {
             perror("Error : Send confirmation");
@@ -424,15 +453,14 @@ int main(int argc, char *argv[]){
           if(current_pos <= 0)
           {
             // This is to empty storage however might lead to unanswered calls from clients.
-            //empty_storage();
+            empty_storage();
           }
-          continue;
         }
         else if(special_exception > 0) // Special exception for some clients.
         {
-          ip = special_exception;
-          spot = special_exception;
-          if(timers[special_exception] > 0)
+          ip = special_exception - 1;
+          spot = special_exception - 1;
+          if(timers[special_exception - 1] > 0)
           {
             // Is validated, check response, send back result
           calcMessage resp;
@@ -446,11 +474,7 @@ int main(int argc, char *argv[]){
           {
             if(newProt.flResult == storage[spot].flResult)
             {
-              printf("Value 1: %8.8g\n", storage[spot].flValue1);
-              printf("Value 2: %8.8g\n", storage[spot].flValue2);
-              printf("Result: %8.8g\n", storage[spot].flResult);
               resp.message = htonl(1);
-              printf("Float response was correct. %d\n", spot);
             }
           }
           else
@@ -458,10 +482,6 @@ int main(int argc, char *argv[]){
             if(newProt.inResult == (int)ntohl(storage[spot].inResult))
             {
               resp.message = htonl(1);
-              printf("Value 1: %d\n", (int)ntohl(storage[spot].inValue1));
-              printf("Value 2: %d\n", (int)ntohl(storage[spot].inValue2));
-              printf("Result: %d\n", (int)ntohl(storage[spot].inResult));
-              printf("Integer response was correct. %d\n", spot);
             }
           }
           int send = sendto(sockfd, &resp, sizeof(resp),
@@ -481,13 +501,11 @@ int main(int argc, char *argv[]){
             // This is to empty storage however might lead to unanswered calls from clients.
             //empty_storage();
           }
-
-          continue;
         }
         else
         {
           // Out of time to respond.
-          printf("Slow client tried to answer, ignoring request. %d\n", special_exception);
+          printf("Slow client tried to answer, ignoring request. %d %d\n", special_exception, (int)addresses.size());
           calcMessage error;
           error.type = htons(2);
           error.message = htonl(2);

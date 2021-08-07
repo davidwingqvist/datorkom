@@ -38,7 +38,7 @@ int integer_calculate(int first, int second, int calcType)
     result = (int)(first / second);
   }
     // Do calculations then return it as result
-  printf("(client)integer result: %d\n", result); // TO BE REMOVED
+  //printf("(client)integer result: %d\n", result); // TO BE REMOVED
   return result;
 }
 
@@ -63,7 +63,7 @@ double float_calculate(double first, double second, int calcType)
       result = first / second;
     }
 
-    printf("(client)float result: %lf\n", result); // TO BE REMOVED
+    //printf("(client)float result: %lf\n", result); // TO BE REMOVED
     return result;
 }
 
@@ -145,6 +145,7 @@ int main(int argc, char *argv[])
   // Send over package to server
   int len = sendto(sockfd, &cliBuf, sizeof(cliBuf),
             0, p->ai_addr, p->ai_addrlen);
+  printf("First send: %d\n", len);
 
   if(len == -1)
   {
@@ -181,12 +182,12 @@ int main(int argc, char *argv[])
         // Load in the float values
         if(arith >= 5)
         {
-          printf("(Server)First: %lf, Second: %lf\n", val1, val2);
+          //printf("(Server)First: %lf, Second: %lf\n", val1, val2);
           fresult = float_calculate(val1, val2, arith); // Calculate the result of arith sent by server
         }
         else // else load in the integer values
         {
-          printf("(Server)First: %d, Second: %d\n", inVal1, inVal2);
+          //printf("(Server)First: %d, Second: %d\n", inVal1, inVal2);
           result = integer_calculate(inVal1, inVal2, arith);
         }
 
