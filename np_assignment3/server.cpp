@@ -13,6 +13,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <errno.h>
+#include <sys/time.h>
 
 // Maximum length of a chat message
 #define MAX 255
@@ -25,27 +26,16 @@ int main(int argc, char *argv[])
     	exit(0);
   	}
 
+  std::string version_name = "HELLO 1";
+
   /* Do more magic */
   int connfd;
-  socklen_t len;
   struct sockaddr_in servaddr, cli;
-  char serv_buf[MAX] = "TEXT TCP 1.0\n\n";
-  char their_buf[MAX];
-  
-  char calc[MAX];
-  char cli_calc[MAX];
-  char cval[MAX];
-  int i_result;
-  double d_result;
-  int var = 0;
-  double fval1, fval2;
-  char* type;
-  
-  int val1, val2;
-  
- struct addrinfo hints, *servinfo, *p;
 
-  int amount_of_units = 0;
+  // Constantly pointing to text "TEXT TCP 1.0"
+  char msg_buf[MAX];
+  
+  struct addrinfo hints, *servinfo, *p;
 
   // Divide string into two parts 
   char* adress = strtok(argv[1], ":");
@@ -86,6 +76,15 @@ int main(int argc, char *argv[])
   }
 
   freeaddrinfo(servinfo);
+  //int flags = fcntl(connfd, F_GETFL, 0);
+	//fcntl(connfd, F_SETFL, flags | O_NONBLOCK);
+
+  socklen_t len = sizeof cli;
+  struct itimerval alarmTime;
+  alarmTime.it_interval.tv_sec=10;
+  alarmTime.it_interval.tv_usec=10;
+  alarmTime.it_value.tv_sec=10;
+  alarmTime.it_value.tv_usec=10;
   
 while(1)
 {
@@ -95,11 +94,13 @@ while(1)
 	len = sizeof(cli);
 	connfd = accept(sockfd, (struct sockaddr*)&cli, &len); // Accepted
 
-	int flags = fcntl(connfd, F_GETFL, 0);
-	fcntl(connfd, F_SETFL, flags | O_NONBLOCK);
+  memset(msg_buf, 0, sizeof msg_buf);
+  int size = read(connfd, msg_buf, sizeof(msg_buf));
+  printf("Message: %s\n", msg_buf);
   
 	//Write out supported protocols
-	write(connfd, serv_buf, strlen(serv_buf));
+  memset(msg_buf, 0, sizeof(msg_buf));
+	write(connfd, msg_buf, strlen(msg_buf));
 
 	close(connfd);
 }

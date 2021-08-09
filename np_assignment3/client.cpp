@@ -11,6 +11,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <vector>
+#include <iostream>
+#include <string>
 
 #define MAX 255
 #define USERLEN 12
@@ -24,9 +26,11 @@ int main(int argc, char *argv[]){
     exit(0);
   }
   
-  std::vector<int> test;
-  // Reset the memory positions of all values to lower chance of crap values
-  // Divide string into two parts 
+  std::string version_name = "HELLO 1";
+
+  char servbuf[MAX];
+  std::string user_name = argv[2];
+
   struct addrinfo hints, *servinfo, *p;
   char* adress = strtok(argv[1], ":");
   char* port = strtok(NULL, "");
@@ -65,14 +69,19 @@ int main(int argc, char *argv[]){
       break;
   }
   freeaddrinfo(servinfo);
- 
-  char servbuf[MAX];
-	
-	// Reset memory each time before we read into it
-	memset(&servbuf, 0, sizeof(servbuf));
-	write(sockfd, &servbuf, sizeof(servbuf));
-  printf("%s\n", servbuf);
 
+  while(1)
+  {
+    // main loop.
+    
+  }
+
+	memset(servbuf, 0, sizeof(servbuf));
+  strcpy(servbuf, argv[2]);
+  std::cout << servbuf << "\n";
+
+	write(sockfd, servbuf, strlen(servbuf));
+  printf("%s\n", servbuf);
  
   close(sockfd);
   return 0;
