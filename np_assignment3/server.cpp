@@ -14,9 +14,19 @@
 #include <signal.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <string>
+#include <iostream>
 
 // Maximum length of a chat message
 #define MAX 255
+
+// Global values for ease of use.
+fd_set current_sockets, ready_sockets;
+int sockfd;
+struct sockaddr_in cli;
+
+// Check for any new connections or events with any current connections.
+int handle_socket(int sock);
 
 int main(int argc, char *argv[])
 {
@@ -29,13 +39,14 @@ int main(int argc, char *argv[])
   std::string version_name = "HELLO 1";
 
   /* Do more magic */
-  int connfd;
-  struct sockaddr_in servaddr, cli;
+  //int connfd;
+  
 
   // Constantly pointing to text "TEXT TCP 1.0"
   char msg_buf[MAX];
   
   struct addrinfo hints, *servinfo, *p;
+  
 
   // Divide string into two parts 
   char* adress = strtok(argv[1], ":");
@@ -55,7 +66,7 @@ int main(int argc, char *argv[])
       exit(0);
   }
 
-  int sockfd;
+  
   for(p = servinfo; p != NULL; p = p->ai_next)
   {
       if((sockfd = socket(p->ai_family, p->ai_socktype,
@@ -75,6 +86,9 @@ int main(int argc, char *argv[])
       break;
   }
 
+  FD_ZERO(&current_sockets);
+  FD_SET(sockfd, &current_sockets);
+
   freeaddrinfo(servinfo);
   //int flags = fcntl(connfd, F_GETFL, 0);
 	//fcntl(connfd, F_SETFL, flags | O_NONBLOCK);
@@ -86,8 +100,54 @@ int main(int argc, char *argv[])
   alarmTime.it_value.tv_sec=10;
   alarmTime.it_value.tv_usec=10;
   
-while(1)
-{
+  while(1)
+  {
+  ready_sockets = current_sockets;
+  int sel = select(FD_SETSIZE, &ready_sockets, NULL, NULL, NULL);
+
+  switch (sel)
+  {
+    case -1: 
+    //std::cout << "Error with connection.\n";
+
+
+    break;
+    case 0:
+    // Timeout.
+    std::cout << "Connection timed out.\n";
+
+    break;
+    default:
+
+    for(int i = 0; i < FD_SETSIZE; i++)
+    {
+      if(FD_ISSET(i, &current_sockets))
+      {
+        // A new connection.
+        if(i == sockfd)
+        {
+          std::cout << "New connection found.\n";
+          // new connection.
+          listen(sockfd, 0);
+          socklen_t len = sizeof(cli);
+          int client_socket = accept(sockfd, (struct sockaddr*)&cli, &len);
+          FD_SET(client_socket, &current_sockets);
+        }
+        else
+        {
+          memset(msg_buf, 0, sizeof msg_buf);
+          read(i, msg_buf, sizeof(msg_buf));
+          if(strlen(msg_buf) > 0)
+            printf("Message: %s\n", msg_buf);
+
+        }
+      }
+    }
+
+    break;
+  }
+
+  /*
 	printf("Waiting for next connection...\n");
 	listen(sockfd, 5); // Listening for connections
   
@@ -95,7 +155,7 @@ while(1)
 	connfd = accept(sockfd, (struct sockaddr*)&cli, &len); // Accepted
 
   memset(msg_buf, 0, sizeof msg_buf);
-  int size = read(connfd, msg_buf, sizeof(msg_buf));
+  read(connfd, msg_buf, sizeof(msg_buf));
   printf("Message: %s\n", msg_buf);
   
 	//Write out supported protocols
@@ -103,7 +163,8 @@ while(1)
 	write(connfd, msg_buf, strlen(msg_buf));
 
 	close(connfd);
-}
+  */
+  }
 
-  return 0;
+  //return 0;
 }

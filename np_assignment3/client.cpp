@@ -70,18 +70,10 @@ int main(int argc, char *argv[]){
   }
   freeaddrinfo(servinfo);
 
-  while(1)
-  {
-    // main loop.
-    
-  }
-
 	memset(servbuf, 0, sizeof(servbuf));
   strcpy(servbuf, argv[2]);
   std::cout << servbuf << "\n";
-
 	write(sockfd, servbuf, strlen(servbuf));
-  printf("%s\n", servbuf);
  
   close(sockfd);
   return 0;
