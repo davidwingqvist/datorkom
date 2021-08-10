@@ -24,7 +24,7 @@
 
 struct package_data
 {
-  char message_type[4];
+  char message_type[5];
   char message_owner[USERLEN];
   char message[MAX];
 };
@@ -84,6 +84,7 @@ int main(int argc, char *argv[])
                         p->ai_protocol)) == -1)
       {
         perror("Listener : Socket");
+        exit(EXIT_FAILURE);
         continue;
       }
 
@@ -91,6 +92,7 @@ int main(int argc, char *argv[])
       {
         close(sockfd);
         perror("Listener : Bind");
+        exit(EXIT_FAILURE);
         continue;
       }
 
@@ -126,7 +128,7 @@ int main(int argc, char *argv[])
     break;
     case 0:
     // Timeout.
-    std::cout << "Connection timed out.\n";
+    //std::cout << "Connection timed out.\n";
 
     break;
     default:
@@ -146,8 +148,7 @@ int main(int argc, char *argv[])
         else
         {
           package_data data;
-          memset(&data, 0, sizeof(package_data));
-          read(i, &data, sizeof(package_data));
+          int rd = read(i, &data, sizeof(package_data));
           int result = handle_connection(&data);
 
           // Handle.
@@ -163,7 +164,7 @@ int main(int argc, char *argv[])
   }
   }
 
-  return 0;
+  return EXIT_SUCCESS;
 }
 
 int handle_connection(package_data* data)

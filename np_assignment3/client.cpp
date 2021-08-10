@@ -17,6 +17,7 @@
 #define MAX 255
 #define USERLEN 12
 #define PACK MAX + USERLEN + 10
+#define STDIN 0
 
 struct package_data
 {
@@ -38,7 +39,7 @@ int main(int argc, char *argv[]){
 
   char servbuf[MAX];
   char user_name[USERLEN];
-  char message[MAX];
+  
   char package[PACK];
 
   strcpy(user_name, argv[2]);
@@ -68,6 +69,7 @@ int main(int argc, char *argv[]){
                         p->ai_protocol)) == -1)
       {
         perror("Listener : Socket");
+        exit(EXIT_FAILURE);
         continue;
       }
 
@@ -75,6 +77,7 @@ int main(int argc, char *argv[]){
       {
         close(sockfd);
         perror("Listener : Connect");
+        exit(EXIT_FAILURE);
         continue;
       }
 
@@ -82,31 +85,34 @@ int main(int argc, char *argv[]){
   }
 
   FD_ZERO(&current_sockets);
+  FD_SET(STDIN, &current_sockets);
   FD_SET(sockfd, &current_sockets);
-  FD_SET(0, &current_sockets);
 
   freeaddrinfo(servinfo);
 
-  fgets(message, 255, stdin);
+  /*
   strcat(package, "MSG");
   strcat(package, user_name);
   strcat(package, message);
+  */
 
-  package_data p1;
-  strcat(p1.message_type, "MSG");
-  strcat(p1.message_owner, user_name);
-  strcat(p1.message, message);
+  
 
   while(1)
   {
     ready_sockets = current_sockets;
+    
 
     int sel = select(FD_SETSIZE, &ready_sockets, NULL, NULL, NULL);
     switch(sel)
     {
       case 0:
+      // Timeout.
+      exit(EXIT_FAILURE);
       break;
       case -1:
+      std::cout << "Something\n";
+      // Fail
       break;
       default:
 
@@ -117,8 +123,18 @@ int main(int argc, char *argv[]){
           // input
           if(i == 0)
           {
+            char message[MAX];
+            memset(message, 0 , sizeof message);
+            fgets(message, 255, stdin);
+
+            package_data p1;
+            strcpy(p1.message_type, "MSG");
+            strcpy(p1.message_owner, user_name);
+            strcpy(p1.message, message);
+
             write(sockfd, &p1, sizeof(package_data));
-            std::cout << p1.message_type << " " << p1.message_owner << " " << p1.message;
+
+            std::cout << "\r" << p1.message_owner << ": " << p1.message;
           }
         }
       }
@@ -129,7 +145,7 @@ int main(int argc, char *argv[]){
   }
  
   close(sockfd);
-  return 0;
+  return EXIT_SUCCESS;
 
 }
 
