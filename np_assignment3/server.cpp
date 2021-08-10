@@ -19,14 +19,24 @@
 
 // Maximum length of a chat message
 #define MAX 255
+#define USERLEN 12
+#define PACK MAX + USERLEN + 5
+
+struct package_data
+{
+  char message_type[4];
+  char message_owner[USERLEN];
+  char message[MAX];
+};
 
 // Global values for ease of use.
 fd_set current_sockets, ready_sockets;
 int sockfd;
 struct sockaddr_in cli;
 
-// Check for any new connections or events with any current connections.
-int handle_socket(int sock);
+
+// Returns -1 on fail, 0 on new connection, 1 on message.
+int handle_connection(package_data* data);
 
 int main(int argc, char *argv[])
 {
@@ -37,6 +47,7 @@ int main(int argc, char *argv[])
   	}
 
   std::string version_name = "HELLO 1";
+  char package[PACK];
 
   /* Do more magic */
   //int connfd;
@@ -99,6 +110,8 @@ int main(int argc, char *argv[])
   alarmTime.it_interval.tv_usec=10;
   alarmTime.it_value.tv_sec=10;
   alarmTime.it_value.tv_usec=10;
+
+  listen(sockfd, 128);
   
   while(1)
   {
@@ -110,7 +123,6 @@ int main(int argc, char *argv[])
     case -1: 
     //std::cout << "Error with connection.\n";
 
-
     break;
     case 0:
     // Timeout.
@@ -121,50 +133,52 @@ int main(int argc, char *argv[])
 
     for(int i = 0; i < FD_SETSIZE; i++)
     {
-      if(FD_ISSET(i, &current_sockets))
+      if(FD_ISSET(i, &ready_sockets))
       {
         // A new connection.
         if(i == sockfd)
         {
-          std::cout << "New connection found.\n";
-          // new connection.
-          listen(sockfd, 0);
           socklen_t len = sizeof(cli);
           int client_socket = accept(sockfd, (struct sockaddr*)&cli, &len);
           FD_SET(client_socket, &current_sockets);
+          std::cout << "New connection found.\n";
         }
         else
         {
-          memset(msg_buf, 0, sizeof msg_buf);
-          read(i, msg_buf, sizeof(msg_buf));
-          if(strlen(msg_buf) > 0)
-            printf("Message: %s\n", msg_buf);
+          package_data data;
+          memset(&data, 0, sizeof(package_data));
+          read(i, &data, sizeof(package_data));
+          int result = handle_connection(&data);
 
+          // Handle.
+          if(result >= 0)
+          {
+            std::cout << data.message_type << " " << data.message_owner << " " << data.message;
+          }
         }
       }
     }
 
     break;
   }
-
-  /*
-	printf("Waiting for next connection...\n");
-	listen(sockfd, 5); // Listening for connections
-  
-	len = sizeof(cli);
-	connfd = accept(sockfd, (struct sockaddr*)&cli, &len); // Accepted
-
-  memset(msg_buf, 0, sizeof msg_buf);
-  read(connfd, msg_buf, sizeof(msg_buf));
-  printf("Message: %s\n", msg_buf);
-  
-	//Write out supported protocols
-  memset(msg_buf, 0, sizeof(msg_buf));
-	write(connfd, msg_buf, strlen(msg_buf));
-
-	close(connfd);
-  */
   }
 
-  //return 0;
+  return 0;
+}
+
+int handle_connection(package_data* data)
+{
+  if(strcmp(data->message_type, "MSG") != NULL)
+  {
+    return 1;
+  }
+  else if (strcmp(data->message_type, "JOIN") != NULL)
+  {
+    return 0;
+  }
+  else if (strcmp(data->message_type, "NICK") != NULL)
+  {
+    return 2;
+  }
+  return -1;
 }

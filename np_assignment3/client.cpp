@@ -16,6 +16,16 @@
 
 #define MAX 255
 #define USERLEN 12
+#define PACK MAX + USERLEN + 10
+
+struct package_data
+{
+  char message_type[5];
+  char message_owner[USERLEN];
+  char message[MAX];
+};
+
+fd_set current_sockets, ready_sockets;
 
 int main(int argc, char *argv[]){
   
@@ -25,11 +35,13 @@ int main(int argc, char *argv[]){
     printf("ONLY 3 ARGUMENTS ARE ACCEPTED\n PROGRAM IP:PORT USERNAME\n");
     exit(0);
   }
-  
-  std::string version_name = "HELLO 1";
 
   char servbuf[MAX];
-  std::string user_name = argv[2];
+  char user_name[USERLEN];
+  char message[MAX];
+  char package[PACK];
+
+  strcpy(user_name, argv[2]);
 
   struct addrinfo hints, *servinfo, *p;
   char* adress = strtok(argv[1], ":");
@@ -68,12 +80,54 @@ int main(int argc, char *argv[]){
 
       break;
   }
+
+  FD_ZERO(&current_sockets);
+  FD_SET(sockfd, &current_sockets);
+  FD_SET(0, &current_sockets);
+
   freeaddrinfo(servinfo);
 
-	memset(servbuf, 0, sizeof(servbuf));
-  strcpy(servbuf, argv[2]);
-  std::cout << servbuf << "\n";
-	write(sockfd, servbuf, strlen(servbuf));
+  fgets(message, 255, stdin);
+  strcat(package, "MSG");
+  strcat(package, user_name);
+  strcat(package, message);
+
+  package_data p1;
+  strcat(p1.message_type, "MSG");
+  strcat(p1.message_owner, user_name);
+  strcat(p1.message, message);
+
+  while(1)
+  {
+    ready_sockets = current_sockets;
+
+    int sel = select(FD_SETSIZE, &ready_sockets, NULL, NULL, NULL);
+    switch(sel)
+    {
+      case 0:
+      break;
+      case -1:
+      break;
+      default:
+
+      for(int i = 0; i < FD_SETSIZE; i++)
+      {
+        if(FD_ISSET(i, &ready_sockets))
+        {
+          // input
+          if(i == 0)
+          {
+            write(sockfd, &p1, sizeof(package_data));
+            std::cout << p1.message_type << " " << p1.message_owner << " " << p1.message;
+            FD_ZERO(i, &ready_sockets);
+          }
+        }
+      }
+
+      break;
+    }
+	  
+  }
  
   close(sockfd);
   return 0;
