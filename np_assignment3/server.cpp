@@ -30,7 +30,7 @@ struct package_data
 };
 
 // Global values for ease of use.
-fd_set current_sockets, ready_sockets;
+fd_set current_sockets, ready_sockets, handle_sockets;
 int sockfd;
 struct sockaddr_in cli;
 
@@ -60,9 +60,9 @@ int main(int argc, char *argv[])
   
 
   // Divide string into two parts 
-  char* adress = strtok(argv[1], ":");
+  char* address = strtok(argv[1], ":");
   char* port = strtok(NULL, "");
-  printf("Host %s ", adress);
+  printf("Host %s ", address);
   printf("and port %s\n", port);
 
   memset(&hints, 0, sizeof(hints));
@@ -71,9 +71,9 @@ int main(int argc, char *argv[])
   hints.ai_flags = AI_CANONNAME;
   
   int rv;
-  if((rv = getaddrinfo(adress, port, &hints, &servinfo)) != 0)
+  if((rv = getaddrinfo(address, port, &hints, &servinfo)) != 0)
   {
-      perror("Adress info");
+      perror("Address info");
       exit(0);
   }
 
@@ -118,12 +118,14 @@ int main(int argc, char *argv[])
   while(1)
   {
   ready_sockets = current_sockets;
-  int sel = select(FD_SETSIZE, &ready_sockets, NULL, NULL, NULL);
+  handle_sockets = current_sockets;
+  int sel = select(FD_SETSIZE, &ready_sockets, &handle_sockets, NULL, NULL);
 
   switch (sel)
   {
     case -1: 
-    //std::cout << "Error with connection.\n";
+    std::cout << "Error with connection.\n";
+    exit(EXIT_FAILURE);
 
     break;
     case 0:
@@ -133,8 +135,10 @@ int main(int argc, char *argv[])
     break;
     default:
 
+    
     for(int i = 0; i < FD_SETSIZE; i++)
     {
+      // write sockets.
       if(FD_ISSET(i, &ready_sockets))
       {
         // A new connection.
@@ -150,14 +154,29 @@ int main(int argc, char *argv[])
           package_data data;
           int rd = read(i, &data, sizeof(package_data));
           int result = handle_connection(&data);
+          std::cout << result << "\n";
 
           // Handle.
-          if(result >= 0)
+          if(result == 1)
           {
             std::cout << data.message_type << " " << data.message_owner << " " << data.message;
+            for(int j = 0; j < FD_SETSIZE; j++)
+            {
+              // Write sockets.
+              if(FD_ISSET(j, &handle_sockets) && j != sockfd && j != i)
+              {
+                int wr = write(j, &data, sizeof(package_data));
+                if(wr == -1)
+                {
+                  perror("Write to client : ");
+                }
+              }
+            }
           }
         }
       }
+
+      
     }
 
     break;
@@ -169,15 +188,15 @@ int main(int argc, char *argv[])
 
 int handle_connection(package_data* data)
 {
-  if(strcmp(data->message_type, "MSG") != NULL)
+  if(strcmp(data->message_type, "MSG") == 0)
   {
     return 1;
   }
-  else if (strcmp(data->message_type, "JOIN") != NULL)
+  else if (strcmp(data->message_type, "JOIN") == 0)
   {
     return 0;
   }
-  else if (strcmp(data->message_type, "NICK") != NULL)
+  else if (strcmp(data->message_type, "NICK") == 0)
   {
     return 2;
   }

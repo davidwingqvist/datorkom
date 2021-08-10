@@ -45,9 +45,9 @@ int main(int argc, char *argv[]){
   strcpy(user_name, argv[2]);
 
   struct addrinfo hints, *servinfo, *p;
-  char* adress = strtok(argv[1], ":");
+  char* address = strtok(argv[1], ":");
   char* port = strtok(NULL, "");
-  printf("Host %s ", adress);
+  printf("Host %s ", address);
   printf("and port %s\n", port);
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
@@ -56,9 +56,9 @@ int main(int argc, char *argv[]){
 
 
   int rv;
-  if((rv = getaddrinfo(adress, port, &hints, &servinfo)) != 0)
+  if((rv = getaddrinfo(address, port, &hints, &servinfo)) != 0)
   {
-      perror("Adress info");
+      perror("Address info");
       exit(0);
   }
 
@@ -111,8 +111,8 @@ int main(int argc, char *argv[]){
       exit(EXIT_FAILURE);
       break;
       case -1:
-      std::cout << "Something\n";
-      // Fail
+      std::cout << "Timeout from server.\n";
+      exit(EXIT_FAILURE);
       break;
       default:
 
@@ -132,9 +132,26 @@ int main(int argc, char *argv[]){
             strcpy(p1.message_owner, user_name);
             strcpy(p1.message, message);
 
-            write(sockfd, &p1, sizeof(package_data));
-
-            std::cout << "\r" << p1.message_owner << ": " << p1.message;
+            int wr = write(sockfd, &p1, sizeof(package_data));
+            if(wr == -1)
+              perror("Error write : ");
+          }
+          // Read for messages.
+          else if(i == sockfd)
+          {
+            package_data data;
+            int r = read(sockfd, &data, sizeof(package_data));
+            if(r > 0)
+            {
+              std::cout << data.message_owner << ": " << data.message;
+            }
+            else
+            {
+              // Disconnect.
+              perror("Error read : ");
+              close(sockfd);
+              exit(EXIT_FAILURE);
+            }
           }
         }
       }
