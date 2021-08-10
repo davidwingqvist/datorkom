@@ -119,7 +119,6 @@ int main(int argc, char *argv[]){
           {
             write(sockfd, &p1, sizeof(package_data));
             std::cout << p1.message_type << " " << p1.message_owner << " " << p1.message;
-            FD_ZERO(i, &ready_sockets);
           }
         }
       }
