@@ -13,6 +13,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <errno.h>
+#include <curses.h>
 #include <sys/time.h>
 #include <string>
 #include <iostream>
@@ -148,13 +149,30 @@ int main(int argc, char *argv[])
           int client_socket = accept(sockfd, (struct sockaddr*)&cli, &len);
           FD_SET(client_socket, &current_sockets);
           std::cout << "New connection found.\n";
+
+          package_data data;
+          strcpy(data.message, "Hello 1\n\n");
+          strcpy(data.message_owner, "SERVER");
+          strcpy(data.message_type, "JOIN");
+          int wr = write(client_socket, &data, sizeof(package_data));
+          if(wr == -1)
+          {
+            perror("Write to joined client : ");
+          }
         }
         else
         {
           package_data data;
           int rd = read(i, &data, sizeof(package_data));
+          if(rd == 0)
+          {
+            // A 0 return from read means connection has been discontinued.
+            printf("User has disconnected.\n");
+            FD_CLR(i, &current_sockets);
+            close(i);
+            break;
+          }
           int result = handle_connection(&data);
-          std::cout << result << "\n";
 
           // Handle.
           if(result == 1)

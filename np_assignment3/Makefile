@@ -21,10 +21,10 @@ test: main.o
 
 
 client: client.o
-	$(CXX) -L./ -Wall -o cchat client.o
+	$(CXX) -L./ -Wall -o cchat client.o -lncurses
 
 server: server.o
-	$(CXX) -L./ -Wall -o cserverd server.o
+	$(CXX) -L./ -Wall -o cserverd server.o -lncurses
 
 
 clean:

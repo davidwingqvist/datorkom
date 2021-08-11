@@ -9,10 +9,12 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
+#include <curses.h>
 #include <unistd.h>
 #include <vector>
 #include <iostream>
 #include <string>
+#include <regex.h>
 
 #define MAX 255
 #define USERLEN 12
@@ -37,22 +39,62 @@ int main(int argc, char *argv[]){
     exit(0);
   }
 
+  /*
+  initscr();
+  cbreak();
+  noecho();
+  getch();
+  echo();
+  nocbreak();
+  delwin(stdscr);
+  endwin();
+  */
+
   char servbuf[MAX];
   char user_name[USERLEN];
   
   char package[PACK];
-
   strcpy(user_name, argv[2]);
 
   struct addrinfo hints, *servinfo, *p;
   char* address = strtok(argv[1], ":");
   char* port = strtok(NULL, "");
+  
+  char *expression="^[A-Za-z_]+$";
+  regex_t regularexpression;
+  int reti;
+  
+  reti=regcomp(&regularexpression, expression, REG_EXTENDED);
+  if(reti){
+    fprintf(stderr, "Could not compile regex.\n");
+    exit(1);
+  }
+
   printf("Host %s ", address);
   printf("and port %s\n", port);
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_CANONNAME;
+
+  int matches;
+  regmatch_t items;
+
+  for(int i=2;i<argc;i++){
+    if(strlen(argv[i])<12){
+      reti=regexec(&regularexpression, argv[i],matches,&items,0);
+      if(!reti){
+	      //printf("Nick %s is accepted.\n",argv[i]);
+    	  printf("Nickname is accepted.\n");
+      } else {
+	      printf("Nickname is NOT accepted.\n");
+        exit(EXIT_FAILURE);
+      }
+    } else {
+        printf("Nickname is TOO LONG.\n");
+        exit(EXIT_FAILURE);
+    }
+  }
 
 
   int rv;
@@ -69,6 +111,7 @@ int main(int argc, char *argv[]){
                         p->ai_protocol)) == -1)
       {
         perror("Listener : Socket");
+        close(sockfd);
         exit(EXIT_FAILURE);
         continue;
       }
@@ -96,13 +139,14 @@ int main(int argc, char *argv[]){
   strcat(package, message);
   */
 
-  
+  package_data init_data;
+  strcpy(init_data.message_type, "JOIN");
+  strcpy(init_data.message_owner, user_name);
+  strcpy(init_data.message, "");
 
   while(1)
   {
     ready_sockets = current_sockets;
-    
-
     int sel = select(FD_SETSIZE, &ready_sockets, NULL, NULL, NULL);
     switch(sel)
     {
@@ -125,16 +169,20 @@ int main(int argc, char *argv[]){
           {
             char message[MAX];
             memset(message, 0 , sizeof message);
-            fgets(message, 255, stdin);
+            fgets(message, MAX, stdin);
 
             package_data p1;
             strcpy(p1.message_type, "MSG");
-            strcpy(p1.message_owner, user_name);
-            strcpy(p1.message, message);
+            strncpy(p1.message_owner, user_name, USERLEN);
+            strncpy(p1.message, message, MAX);
 
             int wr = write(sockfd, &p1, sizeof(package_data));
             if(wr == -1)
+            {
               perror("Error write : ");
+              close(sockfd);
+              exit(EXIT_FAILURE);
+            }
           }
           // Read for messages.
           else if(i == sockfd)
@@ -148,9 +196,9 @@ int main(int argc, char *argv[]){
             else
             {
               // Disconnect.
-              perror("Error read : ");
+              printf("Server shutdown.\n");
               close(sockfd);
-              exit(EXIT_FAILURE);
+              exit(EXIT_SUCCESS);
             }
           }
         }
