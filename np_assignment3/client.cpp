@@ -18,17 +18,17 @@
 
 #define MAX 255
 #define USERLEN 12
-#define PACK MAX + USERLEN + 10
 #define STDIN 0
 
 struct package_data
 {
-  char message_type[5];
   char message_owner[USERLEN];
   char message[MAX];
+  char message_type[5];
 };
 
 fd_set current_sockets, ready_sockets;
+int handle_connection(char* data);
 
 int main(int argc, char *argv[]){
   
@@ -42,18 +42,14 @@ int main(int argc, char *argv[]){
   /*
   initscr();
   cbreak();
-  noecho();
-  getch();
   echo();
+  getch();
   nocbreak();
   delwin(stdscr);
   endwin();
   */
 
-  char servbuf[MAX];
   char user_name[USERLEN];
-  
-  char package[PACK];
   strcpy(user_name, argv[2]);
 
   struct addrinfo hints, *servinfo, *p;
@@ -84,7 +80,6 @@ int main(int argc, char *argv[]){
     if(strlen(argv[i])<12){
       reti=regexec(&regularexpression, argv[i],matches,&items,0);
       if(!reti){
-	      //printf("Nick %s is accepted.\n",argv[i]);
     	  printf("Nickname is accepted.\n");
       } else {
 	      printf("Nickname is NOT accepted.\n");
@@ -133,17 +128,7 @@ int main(int argc, char *argv[]){
 
   freeaddrinfo(servinfo);
 
-  /*
-  strcat(package, "MSG");
-  strcat(package, user_name);
-  strcat(package, message);
-  */
-
-  package_data init_data;
-  strcpy(init_data.message_type, "JOIN");
-  strcpy(init_data.message_owner, user_name);
-  strcpy(init_data.message, "");
-
+  bool accepted = false;
   while(1)
   {
     ready_sockets = current_sockets;
@@ -165,18 +150,19 @@ int main(int argc, char *argv[]){
         if(FD_ISSET(i, &ready_sockets))
         {
           // input
-          if(i == 0)
+          if(i == 0 && accepted)
           {
             char message[MAX];
-            memset(message, 0 , sizeof message);
+            memset(message, 0 , sizeof message); 
             fgets(message, MAX, stdin);
 
-            package_data p1;
-            strcpy(p1.message_type, "MSG");
-            strncpy(p1.message_owner, user_name, USERLEN);
-            strncpy(p1.message, message, MAX);
+            char mess[MAX];
+            memset(mess, 0, sizeof mess);
 
-            int wr = write(sockfd, &p1, sizeof(package_data));
+            strncpy(mess, "MSG ", 5);
+            strncat(mess, message, MAX - 5);
+
+            int wr = write(sockfd, mess, strlen(mess));
             if(wr == -1)
             {
               perror("Error write : ");
@@ -187,16 +173,59 @@ int main(int argc, char *argv[]){
           // Read for messages.
           else if(i == sockfd)
           {
-            package_data data;
-            int r = read(sockfd, &data, sizeof(package_data));
+            char message[MAX];
+            memset(message, 0, sizeof message);
+
+            int r = read(sockfd, &message, sizeof(message));
             if(r > 0)
             {
-              std::cout << data.message_owner << ": " << data.message;
+              int compare = handle_connection(message);
+              //std::cout << "Result with connection: " << compare << "\n";
+
+              if(compare == 1)
+              {
+                std::string m(message);
+                std::string user(user_name);
+
+                // Check if its the users message.
+                if(m.find(user) >= 5)
+                {
+                  std::string prep(message);
+                  std::string output = prep.substr(4, prep.length() - 1);
+                  size_t n = output.find(" ", 1);
+                  output.insert(n, ":");
+
+                  std::cout << output;
+                }
+              }
+              // Allow on client side to send messages.
+              else if(compare == 0)
+              {
+                // send over nickname.
+                char name_pack[USERLEN];
+                memset(name_pack, 0, sizeof name_pack);
+                strncpy(name_pack, user_name, USERLEN);
+
+                int snd = write(sockfd, name_pack, sizeof name_pack);
+                if(snd == -1)
+                  perror("Error sending nickname : ");
+              }
+              else if(compare == -2)
+              {
+                std::cout << "Error, not accepted nickname\n";
+                close(sockfd);
+                exit(EXIT_FAILURE);
+              }
+              else if (compare == 3)
+              {
+                accepted = true;
+              }
             }
             else
             {
               // Disconnect.
-              printf("Server shutdown.\n");
+              memset(message, 0, sizeof message);
+              std::cout << "Server shutdown.\n";
               close(sockfd);
               exit(EXIT_SUCCESS);
             }
@@ -214,3 +243,26 @@ int main(int argc, char *argv[]){
 
 }
 
+int handle_connection(char* data)
+{
+  std::string compare(data);
+  //std::cout << "String to compare: " << compare << "\n";
+  if(compare.find("MSG") <= 3)
+  {
+    return 1;
+  }
+  if(compare.find("Hello 1\n") != std::string::npos)
+  {
+    return 0;
+  }
+  if(compare.find("OK") != std::string::npos)
+  {
+    return 3;
+  }
+    if(compare.find("ERROR") != std::string::npos)
+  {
+    return -2;
+  }
+
+  return -1;
+}

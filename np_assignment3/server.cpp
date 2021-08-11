@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <string>
 #include <iostream>
+#include <regex.h>
 
 // Maximum length of a chat message
 #define MAX 255
@@ -25,9 +26,9 @@
 
 struct package_data
 {
-  char message_type[5];
   char message_owner[USERLEN];
   char message[MAX];
+  char message_type[5];
 };
 
 // Global values for ease of use.
@@ -35,9 +36,15 @@ fd_set current_sockets, ready_sockets, handle_sockets;
 int sockfd;
 struct sockaddr_in cli;
 
+// stored nicknames
+std::string nick_names[FD_SETSIZE] = {"NON"};
+
+// stored statuses, -1 = closed, 0 = starting up, 1 = accepted
+int statuses[FD_SETSIZE] = { -1 };
+
 
 // Returns -1 on fail, 0 on new connection, 1 on message.
-int handle_connection(package_data* data);
+int handle_connection(char* data);
 
 int main(int argc, char *argv[])
 {
@@ -50,12 +57,15 @@ int main(int argc, char *argv[])
   std::string version_name = "HELLO 1";
   char package[PACK];
 
-  /* Do more magic */
-  //int connfd;
+  char *expression="^[A-Za-z_]+$";
+  regex_t regularexpression;
+  int reti;
   
-
-  // Constantly pointing to text "TEXT TCP 1.0"
-  char msg_buf[MAX];
+  reti=regcomp(&regularexpression, expression, REG_EXTENDED);
+  if(reti){
+    fprintf(stderr, "Could not compile regex.\n");
+    exit(1);
+  }
   
   struct addrinfo hints, *servinfo, *p;
   
@@ -150,46 +160,98 @@ int main(int argc, char *argv[])
           FD_SET(client_socket, &current_sockets);
           std::cout << "New connection found.\n";
 
-          package_data data;
-          strcpy(data.message, "Hello 1\n\n");
-          strcpy(data.message_owner, "SERVER");
-          strcpy(data.message_type, "JOIN");
-          int wr = write(client_socket, &data, sizeof(package_data));
+          char data[MAX];
+          memset(data, 0, sizeof data);
+          
+          strncpy(data, "Hello 1\n", MAX);
+          int wr = write(client_socket, &data, strlen(data));
           if(wr == -1)
           {
             perror("Write to joined client : ");
           }
+          statuses[client_socket] = 0;
         }
         else
         {
-          package_data data;
-          int rd = read(i, &data, sizeof(package_data));
+          char data[MAX];
+          memset(data, 0, sizeof data);
+          int rd = read(i, &data, sizeof(data));
           if(rd == 0)
           {
             // A 0 return from read means connection has been discontinued.
             printf("User has disconnected.\n");
             FD_CLR(i, &current_sockets);
+            statuses[i] = -1;
+            nick_names[i] = "NON";
             close(i);
             break;
           }
-          int result = handle_connection(&data);
+          int result = handle_connection(data);
+          std::cout << "Result: " << result << "\n";
 
           // Handle.
-          if(result == 1)
+          if(result == 1 && statuses[i] == 1)
           {
-            std::cout << data.message_type << " " << data.message_owner << " " << data.message;
+            std::string pack(data);
+            std::string mess = pack.substr(4, pack.length() - 1);
+            memset(data, 0, sizeof data);
+
+            // Divide it up so we can format it.
+            strcpy(data, "MSG ");
+            strcat(data, nick_names[i].c_str());
+            strcat(data, " ");
+            strcat(data, mess.c_str());
+
+            std::cout << "Message: " << data;
+
+            // Send the package to all clients.
             for(int j = 0; j < FD_SETSIZE; j++)
             {
               // Write sockets.
-              if(FD_ISSET(j, &handle_sockets) && j != sockfd && j != i)
+              if(FD_ISSET(j, &handle_sockets) && statuses[j] == 1)
               {
-                int wr = write(j, &data, sizeof(package_data));
+                int wr = write(j, &data, strlen(data));
                 if(wr == -1)
                 {
                   perror("Write to client : ");
                 }
               }
             }
+          }
+          else if (result == -1) // Handle the nickname call.
+          {
+            char name_suggestion[USERLEN];
+            memset(name_suggestion, 0, sizeof name_suggestion);
+            strncpy(name_suggestion, data, USERLEN);
+
+            char acceptance[MAX];
+            memset(acceptance, 0, sizeof acceptance);
+
+            int matches;
+            regmatch_t items;
+              if(strlen(name_suggestion)<12){
+              reti=regexec(&regularexpression, name_suggestion,matches,&items,0);
+              if(!reti){
+    	          printf("Nickname is accepted.\n");
+                statuses[i] = 1;
+                nick_names[i] = std::string(name_suggestion);
+                strcpy(acceptance, "OK");
+              } else {
+	              printf("Nickname is NOT accepted.\n");
+                statuses[i] = 0;
+                nick_names[i] = "NON";
+                strcpy(acceptance, "ERROR");
+              }
+              } else {
+                printf("Nickname is TOO LONG.\n");
+                statuses[i] = 0;
+                nick_names[i] = "NON";
+                strcpy(acceptance, "ERROR");
+              }
+
+            int acc = write(i, acceptance, sizeof acceptance);
+            if(acc == -1)
+              perror("Error sending acceptance : ");
           }
         }
       }
@@ -204,19 +266,14 @@ int main(int argc, char *argv[])
   return EXIT_SUCCESS;
 }
 
-int handle_connection(package_data* data)
+int handle_connection(char* data)
 {
-  if(strcmp(data->message_type, "MSG") == 0)
+  std::string compare(data);
+  //std::cout << "String to compare: " << compare << "\n";
+  if(compare.find("MSG") <= 3)
   {
     return 1;
   }
-  else if (strcmp(data->message_type, "JOIN") == 0)
-  {
-    return 0;
-  }
-  else if (strcmp(data->message_type, "NICK") == 0)
-  {
-    return 2;
-  }
+
   return -1;
 }
