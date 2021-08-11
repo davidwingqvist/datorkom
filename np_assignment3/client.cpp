@@ -182,21 +182,14 @@ int main(int argc, char *argv[]){
               int compare = handle_connection(message);
               //std::cout << "Result with connection: " << compare << "\n";
 
-              if(compare == 1)
+              if(compare == 1 && strlen(message) > 0)
               {
-                std::string m(message);
-                std::string user(user_name);
+                std::string output = message;
+                output.erase(0, 4);
 
-                // Check if its the users message.
-                if(m.find(user) >= 5)
-                {
-                  std::string prep(message);
-                  std::string output = prep.substr(4, prep.length() - 1);
-                  size_t n = output.find(" ", 1);
-                  output.insert(n, ":");
-
+                // No echoing back our message.
+                if((output.find(user_name)) > strlen(user_name))
                   std::cout << output;
-                }
               }
               // Allow on client side to send messages.
               else if(compare == 0)
@@ -204,7 +197,7 @@ int main(int argc, char *argv[]){
                 // send over nickname.
                 char name_pack[USERLEN];
                 memset(name_pack, 0, sizeof name_pack);
-                strncpy(name_pack, user_name, USERLEN);
+                strcpy(name_pack, user_name);
 
                 int snd = write(sockfd, name_pack, sizeof name_pack);
                 if(snd == -1)

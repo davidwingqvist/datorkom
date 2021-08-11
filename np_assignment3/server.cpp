@@ -184,16 +184,20 @@ int main(int argc, char *argv[])
             statuses[i] = -1;
             nick_names[i] = "NON";
             close(i);
-            break;
+            continue;
           }
           int result = handle_connection(data);
-          std::cout << "Result: " << result << "\n";
+          //std::cout << "Result: " << result << "\n";
 
           // Handle.
-          if(result == 1 && statuses[i] == 1)
+          if(result == 1 && statuses[i] == 1 && rd > 0)
           {
             std::string pack(data);
-            std::string mess = pack.substr(4, pack.length() - 1);
+            std::string mess = "NON";
+
+            if(pack.length() > 0)
+              mess = pack.substr(4, pack.length() - 1);
+
             memset(data, 0, sizeof data);
 
             // Divide it up so we can format it.
@@ -202,7 +206,7 @@ int main(int argc, char *argv[])
             strcat(data, " ");
             strcat(data, mess.c_str());
 
-            std::cout << "Message: " << data;
+            //std::cout << data;
 
             // Send the package to all clients.
             for(int j = 0; j < FD_SETSIZE; j++)
@@ -259,7 +263,7 @@ int main(int argc, char *argv[])
       
     }
 
-    break;
+    //break;
   }
   }
 
