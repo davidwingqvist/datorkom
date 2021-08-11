@@ -56,7 +56,7 @@ int main(int argc, char *argv[]){
   char* address = strtok(argv[1], ":");
   char* port = strtok(NULL, "");
   
-  char *expression="^[A-Za-z_]+$";
+  char *expression="^[A-Za-z0-9]";
   regex_t regularexpression;
   int reti;
   
@@ -73,7 +73,7 @@ int main(int argc, char *argv[]){
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_CANONNAME;
 
-  int matches;
+  int matches = 0;
   regmatch_t items;
 
   for(int i=2;i<argc;i++){
@@ -230,7 +230,8 @@ int main(int argc, char *argv[]){
     }
 	  
   }
- 
+
+  regfree(&regularexpression);
   close(sockfd);
   return EXIT_SUCCESS;
 

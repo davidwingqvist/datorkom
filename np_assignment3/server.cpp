@@ -57,11 +57,12 @@ int main(int argc, char *argv[])
   std::string version_name = "HELLO 1";
   char package[PACK];
 
-  char *expression="^[A-Za-z_]+$";
   regex_t regularexpression;
   int reti;
+  int matches = 0;
+  regmatch_t items;
   
-  reti=regcomp(&regularexpression, expression, REG_EXTENDED);
+  reti=regcomp(&regularexpression, "[A-Za-z0-9]", REG_EXTENDED);
   if(reti){
     fprintf(stderr, "Could not compile regex.\n");
     exit(1);
@@ -224,21 +225,16 @@ int main(int argc, char *argv[])
           }
           else if (result == -1) // Handle the nickname call.
           {
-            char name_suggestion[USERLEN];
-            memset(name_suggestion, 0, sizeof name_suggestion);
-            strncpy(name_suggestion, data, USERLEN);
-
             char acceptance[MAX];
             memset(acceptance, 0, sizeof acceptance);
 
-            int matches;
-            regmatch_t items;
-              if(strlen(name_suggestion)<12){
-              reti=regexec(&regularexpression, name_suggestion,matches,&items,0);
+
+              if(strlen(data)<12){
+              reti=regexec(&regularexpression, data, matches, &items,0);
               if(!reti){
     	          printf("Nickname is accepted.\n");
                 statuses[i] = 1;
-                nick_names[i] = std::string(name_suggestion);
+                nick_names[i] = std::string(data);
                 strcpy(acceptance, "OK");
               } else {
 	              printf("Nickname is NOT accepted.\n");
@@ -267,6 +263,8 @@ int main(int argc, char *argv[])
   }
   }
 
+  regfree(&regularexpression);
+  close(sockfd);
   return EXIT_SUCCESS;
 }
 
