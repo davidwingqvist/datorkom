@@ -17,7 +17,7 @@
 #include <regex.h>
 
 #define MAX 255
-#define USERLEN 12
+#define USERLEN 13
 #define STDIN 0
 
 struct package_data
@@ -77,16 +77,16 @@ int main(int argc, char *argv[]){
   regmatch_t items;
 
   for(int i=2;i<argc;i++){
-    if(strlen(argv[i])<12){
+    if(strlen(argv[i])<=12){
       reti=regexec(&regularexpression, argv[i],matches,&items,0);
       if(!reti){
-    	  printf("Nickname is accepted.\n");
+    	  printf("Nickname is accepted on client side.\n");
       } else {
-	      printf("Nickname is NOT accepted.\n");
+	      printf("Nickname is NOT accepted on client side.\n");
         exit(EXIT_FAILURE);
       }
     } else {
-        printf("Nickname is TOO LONG.\n");
+        printf("Nickname is TOO LONG on client side.\n");
         exit(EXIT_FAILURE);
     }
   }
@@ -188,16 +188,18 @@ int main(int argc, char *argv[]){
                 output.erase(0, 4);
 
                 // No echoing back our message.
-                if((output.find(user_name)) > strlen(user_name))
+                output.find(user_name);
+                if((output.find(user_name)) >= strlen(user_name))
                   std::cout << output;
               }
               // Allow on client side to send messages.
               else if(compare == 0)
               {
                 // send over nickname.
-                char name_pack[USERLEN];
+                char name_pack[MAX];
                 memset(name_pack, 0, sizeof name_pack);
-                strcpy(name_pack, user_name);
+                strcpy(name_pack, "NICK ");
+                strcat(name_pack, user_name);
 
                 int snd = write(sockfd, name_pack, sizeof name_pack);
                 if(snd == -1)
@@ -211,7 +213,14 @@ int main(int argc, char *argv[]){
               }
               else if (compare == 3)
               {
+                std::cout << "[SERVER] Connection has been accepted. Welcome to the chat room!\n";
                 accepted = true;
+              }
+              else
+              {
+                std::cout << "Unkown error, client shutting down.\n";
+                close(sockfd);
+                exit(EXIT_FAILURE);
               }
             }
             else

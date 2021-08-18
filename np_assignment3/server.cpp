@@ -21,7 +21,7 @@
 
 // Maximum length of a chat message
 #define MAX 255
-#define USERLEN 12
+#define USERLEN 13
 #define PACK MAX + USERLEN + 5
 
 struct package_data
@@ -164,6 +164,7 @@ int main(int argc, char *argv[])
           char data[MAX];
           memset(data, 0, sizeof data);
           
+          std::cout << "Sending over [Hello 1] to client.\n";
           strncpy(data, "Hello 1\n", MAX);
           int wr = write(client_socket, &data, strlen(data));
           if(wr == -1)
@@ -190,7 +191,7 @@ int main(int argc, char *argv[])
           int result = handle_connection(data);
           //std::cout << "Result: " << result << "\n";
 
-          // Handle.
+          // Handle chat room chat request.
           if(result == 1 && statuses[i] == 1 && rd > 0)
           {
             std::string pack(data);
@@ -202,12 +203,13 @@ int main(int argc, char *argv[])
             memset(data, 0, sizeof data);
 
             // Divide it up so we can format it.
-            strcpy(data, "MSG ");
+            strcpy(data, "MSG");
             strcat(data, nick_names[i].c_str());
             strcat(data, " ");
             strcat(data, mess.c_str());
 
-            //std::cout << data;
+            // Show chat on server.
+            std::cout << data;
 
             // Send the package to all clients.
             for(int j = 0; j < FD_SETSIZE; j++)
@@ -227,26 +229,30 @@ int main(int argc, char *argv[])
           {
             char acceptance[MAX];
             memset(acceptance, 0, sizeof acceptance);
+            std::string newName(data);
+            std::cout << newName << "\n";
+            memset(data, 0, sizeof data);
+            newName.erase(0, 4);
+            strcpy(data, newName.c_str());
 
-
-              if(strlen(data)<12){
+              if(strlen(data)<=12){
               reti=regexec(&regularexpression, data, matches, &items,0);
               if(!reti){
-    	          printf("Nickname is accepted.\n");
+    	          printf("(Nickname)%s is accepted.\n", data);
                 statuses[i] = 1;
                 nick_names[i] = std::string(data);
-                strcpy(acceptance, "OK");
+                strcpy(acceptance, "OK\n");
               } else {
-	              printf("Nickname is NOT accepted.\n");
+	              printf("(Nickname)%s is NOT accepted.\n");
                 statuses[i] = 0;
                 nick_names[i] = "NON";
-                strcpy(acceptance, "ERROR");
+                strcpy(acceptance, "ERROR\n");
               }
               } else {
-                printf("Nickname is TOO LONG.\n");
+                printf("(Nickname)%s is TOO LONG.\n");
                 statuses[i] = 0;
                 nick_names[i] = "NON";
-                strcpy(acceptance, "ERROR");
+                strcpy(acceptance, "ERROR\n");
               }
 
             int acc = write(i, acceptance, sizeof acceptance);
@@ -276,6 +282,10 @@ int handle_connection(char* data)
   {
     return 1;
   }
+  if(compare.find("NICK") <= 3)
+  {
+    return -1;
+  }
 
-  return -1;
+  return -2;
 }
