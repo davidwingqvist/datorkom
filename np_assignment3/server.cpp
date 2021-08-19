@@ -197,6 +197,7 @@ int main(int argc, char *argv[])
             std::string pack(data);
             std::string mess = "NON";
 
+            /*
             if(pack.length() > 0)
               mess = pack.substr(4, pack.length() - 1);
 
@@ -207,10 +208,60 @@ int main(int argc, char *argv[])
             strcat(data, nick_names[i].c_str());
             strcat(data, " ");
             strcat(data, mess.c_str());
+            */
+
+            // Find any packed together messages.
+            int counter = pack.find("MSG", 0);
+            while(counter != std::string::npos)
+            {
+              memset(data, 0, sizeof data);
+
+              // Create message data.
+              strcpy(data, "MSG");
+              strcat(data, nick_names[i].c_str());
+              strcat(data, " ");
+
+              std::string sub_message;
+              // Create message.
+              int end = pack.find("MSG", counter + 4);
+              //std::cout << "Counter: " << counter << " End: " << end << "\n";
+              //std::cout << "Test: " << pack.substr(counter, end - counter) << " Size: " << pack.substr(counter, end - counter).length() << "\n";
+              if(end == std::string::npos)
+              {
+                end = pack.length();
+                sub_message = pack.substr(counter + 4, end);
+              }
+              else
+              {
+                sub_message = pack.substr(counter + 4, end - counter - 4) + "\n";
+              }
+
+              strcat(data, sub_message.c_str());
+
+              // Show chat on server.
+              std::cout << data;
+
+              // Send the package to all clients.
+              for(int j = 0; j < FD_SETSIZE; j++)
+              { 
+                // Write sockets.
+                if(FD_ISSET(j, &handle_sockets) && statuses[j] == 1)
+                {
+                  int wr = write(j, &data, strlen(data));
+                  if(wr == -1)
+                  {
+                    perror("Write to client : ");
+                  }
+                }
+              }
+
+              counter = pack.find("MSG", end);
+            }
 
             // Show chat on server.
-            std::cout << data;
+            //std::cout << data;
 
+            /*
             // Send the package to all clients.
             for(int j = 0; j < FD_SETSIZE; j++)
             {
@@ -224,6 +275,7 @@ int main(int argc, char *argv[])
                 }
               }
             }
+            */
           }
           else if (result == -1) // Handle the nickname call.
           {
