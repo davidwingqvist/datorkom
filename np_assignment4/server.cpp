@@ -21,13 +21,30 @@
 #include <regex.h>
 #include <vector>
 
-#define MAX_PLAYERS 128
-#define MAX_VIEWER 5
+#define MAX_PLAYERS FD_SETSIZE
+#define MAX_VIEWER 128
+
+struct Data
+{
+  // Check the id of the player.
+  int playerId = -1;
+
+  int isSpectator = true;
+  // The move selection by the player.
+  int selection = -1;
+};
+
+struct Server_Data
+{
+  int playerId = -1;
+  bool further = false;
+};
 
 struct player_data
 {
   int playerId = -1;
   bool isSpectator = false;
+  bool isSearching = false;
 };
 
 struct game_player_data
@@ -41,7 +58,7 @@ struct game_player_data
 struct game_data
 {
   // Check if the game is filled with 2 players yet.
-  bool isFull = false;
+  int nrOfPlayers = 0;
 
   // This is 1 if the main player won, 2 if the opposite side won.
   int winnerId = 0;
@@ -54,6 +71,7 @@ struct game_data
 player_data players[MAX_PLAYERS];
 game_player_data playerData[MAX_PLAYERS];
 game_data games[MAX_PLAYERS];
+int sockets[MAX_PLAYERS];
 
 
 int produceID()
@@ -177,8 +195,16 @@ int main(int argc, char *argv[])
           socklen_t len = sizeof(cli);
           int client_socket = accept(sockfd, (struct sockaddr*)&cli, &len);
           FD_SET(client_socket, &current_sockets);
+          sockets[i] = client_socket;
           players[i].playerId = produceID();
           std::cout << "New connection found.\nID given: " << players[i].playerId << "\n";
+          Server_Data data;
+          data.playerId = players[i].playerId;
+          int wr = write(client_socket, &data, sizeof(data));
+          if(wr == -1)
+          {
+            std::cout << "Error when reporting ID to player " << i << ".\n";
+          }
         }
         else
         {

@@ -17,15 +17,46 @@
 #include <regex.h>
 
 #define STDIN 0
-#define MAX_VIEWER 5
+#define MAX_VIEWER 128
 
 void MainMenu();
+void ChooseGameMenu();
+void SearchingForGame();
 
+struct Server_Data
+{
+  // These bools will mark as points to say if we need to read further or not.
+  int playerId = -1;
+  bool further = false;
+  int timeLeft = -1;
+};
 
+struct Data
+{
+  // Check the id of the player.
+  int playerId = -1;
+
+  int isSpectator = true;
+  // The move selection by the player.
+  int selection = -1;
+};
+
+Data SendDataToServer(int id, int isSpectator, int selection);
+
+/*
+  Different states mandate what kind of reaction a input will cause.
+  0 - Main menu.
+  1 - Choosing game to join.
+  2 - Choosing game to watch.
+  3 - Inside a game.
+  4 - Watching a game.
+*/
 struct state
 {
-  // This is 0 if in menu, this is 1 if in game, this is 2 if is spectating a game.
+  int playerId = -1;
   int current_state = 0;
+  bool isSpectator = false;
+  bool searchingForGame = false;
 }client_state;
 
 struct player_data
@@ -45,7 +76,7 @@ struct game_player_data
 struct game_data
 {
   // Check if the game is filled with 2 players yet.
-  bool isFull = false;
+  int nrOfPlayers = 0;
 
   // This is 1 if the main player won, 2 if the opposite side won.
   int winnerId = 0;
@@ -56,7 +87,6 @@ struct game_data
 };
 
 fd_set current_sockets, ready_sockets;
-
 int main(int argc, char *argv[]){
   
   	/* Do magic */
@@ -138,13 +168,24 @@ int main(int argc, char *argv[]){
           // input
           if(i == 0)
           {
-            char input[2] = {-1};
-            fgets(input, 2, stdin);
+            char input[1];
+            std::cin >> input;
             switch(client_state.current_state)
             {
               case 0:
-              std::cout << input << "\n";
-              if(strcmp(input, "2") == NULL)
+              if(strcmp(input, "0") == NULL)
+              {
+                client_state.current_state = 1;
+                client_state.isSpectator = false;
+                SearchingForGame();
+              }
+              else if(strcmp(input, "1") == NULL)
+              {
+                client_state.current_state = 2;
+                client_state.isSpectator = true;
+                ChooseGameMenu();
+              }
+              else if(strcmp(input, "2") == NULL)
               {
                 close(sockfd);
                 exit(EXIT_SUCCESS);
@@ -154,16 +195,22 @@ int main(int argc, char *argv[]){
               break;
               case 2:
               break;
+              case 3:
+              break;
+              case 4:
+              break;
             }
 
           }
           // Read for messages.
           else if(i == sockfd)
           {
-            int r = 1;//read(sockfd, &message, sizeof(message));
+            Server_Data message;
+            int r = read(sockfd, &message, sizeof(message));
             if(r > 0)
             {
-
+              client_state.playerId = message.playerId;
+              std::cout << "Current ID: " << client_state.playerId << ".\n";
             }
             else
             {
@@ -192,4 +239,26 @@ void MainMenu()
   std::cout << "Please choose one of the options below.\n";
 
   std::cout << "[0] - Join a Game.\n[1] - Spectate a Game.\n[2] - Quit Game\n";
+}
+
+void ChooseGameMenu()
+{
+  std::cout << "Please choosing one of the following available games.\n";
+  std::cout << "TIP - To watch a game simply press the associated number and confirm with enter.\n";
+
+  // std::cout << [ << i << ] << " Ongoing: " << player1.score << " - " << player2.score << "\n"; 
+}
+
+void SearchingForGame()
+{
+  std::cout << "You are now currently searching for a game...\nPlease have patients while the server matches you up with a player.\n";
+}
+
+Data SendDataToServer(int id, int isSpectator, int selection)
+{
+  Data data;
+  data.playerId = id;
+  data.isSpectator = isSpectator;
+  data.selection = selection;
+  return data;
 }
