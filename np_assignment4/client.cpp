@@ -25,16 +25,18 @@ void SearchingForGame();
 
 struct Server_Data
 {
-  // These bools will mark as points to say if we need to read further or not.
   int playerId = -1;
-  bool further = false;
-  int timeLeft = -1;
+  // Specifies what to read in this package.
+  int whatToRead = -1;
 };
 
 struct Data
 {
   // Check the id of the player.
   int playerId = -1;
+
+  // flags to the server that player wants to join a game.
+  int wantToJoin = false;
 
   int isSpectator = true;
   // The move selection by the player.
@@ -56,7 +58,6 @@ struct state
   int playerId = -1;
   int current_state = 0;
   bool isSpectator = false;
-  bool searchingForGame = false;
 }client_state;
 
 struct player_data
@@ -178,6 +179,17 @@ int main(int argc, char *argv[]){
                 client_state.current_state = 1;
                 client_state.isSpectator = false;
                 SearchingForGame();
+
+                // Setting up join request data package.
+                Data data;
+                data.playerId = client_state.playerId;
+                data.wantToJoin = true;
+                data.isSpectator = false;
+                data.selection = -1;
+
+                int wr = write(sockfd, &data, sizeof(data));
+                if(wr == -1)
+                  std::cout << "Sending Join request to server failed.\n";
               }
               else if(strcmp(input, "1") == NULL)
               {

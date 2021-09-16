@@ -20,14 +20,18 @@
 #include <iostream>
 #include <regex.h>
 #include <vector>
+#include <chrono>
 
 #define MAX_PLAYERS FD_SETSIZE
 #define MAX_VIEWER 128
-
+#define MAX_GAMES 9
 struct Data
 {
   // Check the id of the player.
   int playerId = -1;
+
+  // flags to the server that player wants to join a game.
+  int wantToJoin = false;
 
   int isSpectator = true;
   // The move selection by the player.
@@ -87,6 +91,22 @@ int produceID()
   }
 
   return ID;
+}
+
+/*
+  RULES
+  0 - stone
+  1 - sicssor
+  2 - bag
+
+  function returns either 1 as in first player or 2 as in second player
+*/
+int stoneSicssorBag(int first_player, int second_player)
+{
+  if(first_player == 0 && second_player == 1)
+  {
+    return 1;
+  }
 }
 
 
@@ -208,7 +228,7 @@ int main(int argc, char *argv[])
         }
         else
         {
-          game_data data;
+          Data data;
           int rd = read(i, &data, sizeof(data));
           if(rd == 0)
           {
@@ -217,6 +237,10 @@ int main(int argc, char *argv[])
             FD_CLR(i, &current_sockets);
             close(i);
             continue;
+          }
+          else
+          {
+            std::cout << "Client: " << data.playerId << " wants to join? - " << data.wantToJoin << "\n";
           }
         }
       }
