@@ -22,12 +22,21 @@
 void MainMenu();
 void ChooseGameMenu();
 void SearchingForGame();
+void selectMoveScreen();
 
 struct Server_Data
 {
+// WhatToRead = -1
   int playerId = -1;
-  // Specifies what to read in this package.
+
+// Specifies what to read in this package.
   int whatToRead = -1;
+
+// WhatToRead = 0
+  bool gameFound = false;
+
+// WhatToRead = 1
+  float timeLeft = 0.0f;
 };
 
 struct Data
@@ -37,6 +46,8 @@ struct Data
 
   // flags to the server that player wants to join a game.
   int wantToJoin = false;
+
+  bool gameFound = false;
 
   int isSpectator = true;
   // The move selection by the player.
@@ -221,8 +232,19 @@ int main(int argc, char *argv[]){
             int r = read(sockfd, &message, sizeof(message));
             if(r > 0)
             {
-              client_state.playerId = message.playerId;
-              std::cout << "Current ID: " << client_state.playerId << ".\n";
+
+              switch(message.whatToRead)
+              {
+                case -1:
+                client_state.playerId = message.playerId;
+                std::cout << "Current ID: " << client_state.playerId << ".\n";
+                break;
+                case 0:
+                std::cout << "Game has been found!\n";
+                client_state.current_state = 3;
+                selectMoveScreen();
+                break;
+              }
             }
             else
             {
@@ -259,6 +281,15 @@ void ChooseGameMenu()
   std::cout << "TIP - To watch a game simply press the associated number and confirm with enter.\n";
 
   // std::cout << [ << i << ] << " Ongoing: " << player1.score << " - " << player2.score << "\n"; 
+}
+
+void selectMoveScreen()
+{
+  std::cout << "Please choose one of the following choices before the time is up!\n";
+  std::cout << "Leaving it blank or inputting anything other than 1, 2 or 3 will forfeit this round.\n";
+  std::cout << "[1] - Scissor\n";
+  std::cout << "[2] - Stone\n";
+  std::cout << "[3] - Paper\n";
 }
 
 void SearchingForGame()

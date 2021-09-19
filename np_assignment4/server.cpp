@@ -33,6 +33,8 @@ struct Data
   // flags to the server that player wants to join a game.
   int wantToJoin = false;
 
+  bool gameFound = false;
+
   int isSpectator = true;
   // The move selection by the player.
   int selection = -1;
@@ -41,7 +43,11 @@ struct Data
 struct Server_Data
 {
   int playerId = -1;
-  bool further = false;
+  int whatToRead = -1;
+
+  bool gameFound = false;
+
+  float timeLeft = 0.0f;
 };
 
 struct player_data
@@ -49,6 +55,8 @@ struct player_data
   int playerId = -1;
   bool isSpectator = false;
   bool isSearching = false;
+  int playerSocket = -1;
+  int gameID = -1;
 };
 
 struct game_player_data
@@ -69,13 +77,15 @@ struct game_data
 
   int mainPlayerId = -1;
   int opponentPlayerId = -1;
-  int viewerIds[MAX_VIEWER];
+  int viewerIds[MAX_VIEWER] = {0};
+
+  // Timeleft of the round.
+  float timeLeft = 3.0f;
 };
 
-player_data players[MAX_PLAYERS];
-game_player_data playerData[MAX_PLAYERS];
-game_data games[MAX_PLAYERS];
-int sockets[MAX_PLAYERS];
+player_data players[FD_SETSIZE];
+game_player_data playerData[FD_SETSIZE];
+game_data games[FD_SETSIZE];
 
 
 int produceID()
@@ -107,6 +117,69 @@ int stoneSicssorBag(int first_player, int second_player)
   {
     return 1;
   }
+  else if(first_player == 0 && second_player == 2)
+  {
+    return 2;
+  }
+  else if(first_player == 1 && second_player == 0)
+  {
+    return 2;
+  }
+  else if(first_player == 1 && second_player == 2)
+  {
+    return 1;
+  }
+  else if(first_player == 2 && second_player == 0)
+  {
+    return 1;
+  }
+  else if(first_player == 2 && second_player == 1)
+  {
+    return 2;
+  }
+
+  else if(second_player == 0 && first_player == 1)
+  {
+    return 2;
+  }
+  else if(second_player == 0 && first_player == 2)
+  {
+    return 1;
+  }
+  else if(second_player == 1 && first_player == 0)
+  {
+    return 1;
+  }
+  else if(second_player == 1 && first_player == 2)
+  {
+    return 2;
+  }
+  else if(second_player == 2 && first_player == 0)
+  {
+    return 2;
+  }
+  else if(second_player == 2 && first_player == 1)
+  {
+    return 1;
+  }
+
+  return -1;
+}
+
+/*
+  Returns ID of player found that is also searching.
+*/
+int searchForOpponent(int searche)
+{
+  for(int i = 0; i < FD_SETSIZE; i++)
+  {
+    if(players[i].isSearching && i != searche && players[i].isSpectator == false)
+    {
+      return i;
+    }
+  }
+
+  return -1;
 }
 
 
@@ -206,6 +279,63 @@ int main(int argc, char *argv[])
     
     for(int i = 0; i < FD_SETSIZE; i++)
     {
+    if(players[i].isSearching)
+    {
+      int o = searchForOpponent(i);
+
+      // Opponent found.
+      if(o != -1)
+      {
+        std::cout << "Game has been found for " << i << " and " << o << " !\n";
+        players[i].isSearching = false;
+        players[o].isSearching = false;
+        games[i].mainPlayerId = i;
+        games[i].opponentPlayerId = o;
+
+        players[i].gameID = i;
+        players[o].gameID = i;
+        int gameID = i;
+
+        std::cout << "GAME ID: " << i;
+
+        // SETUP game
+        games[gameID].nrOfPlayers = 2;
+        games[gameID].mainPlayerId = i;
+        games[gameID].opponentPlayerId = o;
+
+        // Announce to players that match has been found.
+
+        // First player
+        Server_Data data;
+        data.playerId = players[i].playerId;
+        data.whatToRead = 0;
+        data.gameFound = true;
+
+        int wr = write(i, &data, sizeof(data));
+        if(wr == -1)
+        {
+          perror("Write: ");
+          std::cout << "Game invitation 1 failed\n";
+        }
+
+        // Second player
+        data.playerId = players[o].playerId;
+        data.whatToRead = 0;
+        data.gameFound = true;
+
+        wr = write(o, &data, sizeof(data));
+        if(wr == -1)
+        {
+          std::cout << "Game invitation 2 failed\n";
+        }
+      }
+    }
+
+    // Update games.
+    if(games[i].nrOfPlayers == 2)
+    {
+
+    }
       // write sockets.
       if(FD_ISSET(i, &ready_sockets))
       {
@@ -215,11 +345,11 @@ int main(int argc, char *argv[])
           socklen_t len = sizeof(cli);
           int client_socket = accept(sockfd, (struct sockaddr*)&cli, &len);
           FD_SET(client_socket, &current_sockets);
-          sockets[i] = client_socket;
-          players[i].playerId = produceID();
-          std::cout << "New connection found.\nID given: " << players[i].playerId << "\n";
+          players[client_socket].playerId = client_socket;
+          players[client_socket].playerSocket = client_socket;
+          std::cout << "New connection found.\nID given: " << client_socket << "\n";
           Server_Data data;
-          data.playerId = players[i].playerId;
+          data.playerId = players[client_socket].playerId;
           int wr = write(client_socket, &data, sizeof(data));
           if(wr == -1)
           {
@@ -240,7 +370,9 @@ int main(int argc, char *argv[])
           }
           else
           {
+            // Update client.
             std::cout << "Client: " << data.playerId << " wants to join? - " << data.wantToJoin << "\n";
+            players[i].isSearching = data.wantToJoin;
           }
         }
       }
