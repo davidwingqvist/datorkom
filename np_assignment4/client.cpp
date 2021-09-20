@@ -36,7 +36,9 @@ struct Server_Data
   bool gameFound = false;
 
 // WhatToRead = 1
-  float timeLeft = 0.0f;
+  int timeLeft = 0;
+
+  bool newRound = false;
 };
 
 struct Data
@@ -52,6 +54,7 @@ struct Data
   int isSpectator = true;
   // The move selection by the player.
   int selection = -1;
+  
 };
 
 Data SendDataToServer(int id, int isSpectator, int selection);
@@ -180,6 +183,7 @@ int main(int argc, char *argv[]){
           // input
           if(i == 0)
           {
+            int wr;
             char input[1];
             std::cin >> input;
             switch(client_state.current_state)
@@ -194,7 +198,7 @@ int main(int argc, char *argv[]){
                 // Setting up join request data package.
                 Data data;
                 data.playerId = client_state.playerId;
-                data.wantToJoin = true;
+                data.wantToJoin = 1;
                 data.isSpectator = false;
                 data.selection = -1;
 
@@ -219,6 +223,43 @@ int main(int argc, char *argv[]){
               case 2:
               break;
               case 3:
+              {
+              Data data_sel;
+              if(strcmp(input, "1") == NULL)
+              {
+                data_sel.selection = 0;
+                data_sel.playerId = client_state.playerId;
+                data_sel.isSpectator = false;
+                data_sel.wantToJoin = 2;
+              }
+              else if(strcmp(input, "2") == NULL)
+              {
+                data_sel.selection = 1;
+                data_sel.playerId = client_state.playerId;
+                data_sel.isSpectator = false;
+                data_sel.wantToJoin = 2;
+              }
+              else if(strcmp(input, "3") == NULL)
+              {
+                data_sel.selection = 2;
+                data_sel.playerId = client_state.playerId;
+                data_sel.isSpectator = false;
+                data_sel.wantToJoin = 2;
+              }
+              else
+              {
+                data_sel.selection = -1;
+                data_sel.playerId = client_state.playerId;
+                data_sel.isSpectator = false;
+                data_sel.wantToJoin = 2;
+              }
+
+              wr = write(sockfd, &data_sel, sizeof(Data));
+              if(wr == -1)
+              {
+                perror("Failed to Update selection to server: ");
+              }
+              }
               break;
               case 4:
               break;
@@ -243,6 +284,9 @@ int main(int argc, char *argv[]){
                 std::cout << "Game has been found!\n";
                 client_state.current_state = 3;
                 selectMoveScreen();
+                case 2:
+                std::cout << "Seconds Left: " << message.timeLeft << "\n";
+                break;
                 break;
               }
             }
@@ -287,8 +331,8 @@ void selectMoveScreen()
 {
   std::cout << "Please choose one of the following choices before the time is up!\n";
   std::cout << "Leaving it blank or inputting anything other than 1, 2 or 3 will forfeit this round.\n";
-  std::cout << "[1] - Scissor\n";
-  std::cout << "[2] - Stone\n";
+  std::cout << "[1] - Stone\n";
+  std::cout << "[2] - Scissor\n";
   std::cout << "[3] - Paper\n";
 }
 

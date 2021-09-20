@@ -47,14 +47,16 @@ struct Server_Data
 
   bool gameFound = false;
 
-  float timeLeft = 0.0f;
+  int timeLeft = 0;
+
+  bool newRound = false;
 };
 
 struct player_data
 {
   int playerId = -1;
   bool isSpectator = false;
-  bool isSearching = false;
+  int isSearching = false;
   int playerSocket = -1;
   int gameID = -1;
 };
@@ -72,6 +74,9 @@ struct game_data
   // Check if the game is filled with 2 players yet.
   int nrOfPlayers = 0;
 
+  int mainPlayerChoice = -1;
+  int opponentPlayerChoice = -1;
+
   // This is 1 if the main player won, 2 if the opposite side won.
   int winnerId = 0;
 
@@ -79,8 +84,9 @@ struct game_data
   int opponentPlayerId = -1;
   int viewerIds[MAX_VIEWER] = {0};
 
-  // Timeleft of the round.
-  float timeLeft = 3.0f;
+  std::chrono::steady_clock::time_point startTime;
+  bool resetTime = true;
+  int timer = 0;
 };
 
 player_data players[FD_SETSIZE];
@@ -113,6 +119,15 @@ int produceID()
 */
 int stoneSicssorBag(int first_player, int second_player)
 {
+  if(first_player == -1 && second_player == -1)
+  {
+    return 0;
+  }
+if(first_player == -1)
+return 2;
+else if(second_player == -1)
+return 1;
+
   if(first_player == 0 && second_player == 1)
   {
     return 1;
@@ -183,7 +198,7 @@ int searchForOpponent(int searche)
 }
 
 
-
+auto clock_time = std::chrono::steady_clock::now();
 // Global values for ease of use.
 fd_set current_sockets, ready_sockets, handle_sockets;
 int sockfd;
@@ -258,6 +273,7 @@ int main(int argc, char *argv[])
   
   while(1)
   {
+  clock_time = std::chrono::steady_clock::now();
   ready_sockets = current_sockets;
   handle_sockets = current_sockets;
   int sel = select(FD_SETSIZE, &ready_sockets, &handle_sockets, NULL, NULL);
@@ -279,7 +295,7 @@ int main(int argc, char *argv[])
     
     for(int i = 0; i < FD_SETSIZE; i++)
     {
-    if(players[i].isSearching)
+    if(players[i].isSearching == 1)
     {
       int o = searchForOpponent(i);
 
@@ -334,7 +350,83 @@ int main(int argc, char *argv[])
     // Update games.
     if(games[i].nrOfPlayers == 2)
     {
+      if(games[i].resetTime)
+      {
+        games[i].startTime = std::chrono::steady_clock::now();
+        games[i].resetTime = false;
+      }
 
+      // Elapsed time.
+      std::chrono::duration<float> elap = games[i].startTime - clock_time;
+
+      // Calculate if a second has gone since last second or round start.
+      if(abs(elap.count() - 0.001f) >= games[i].timer)
+      {
+        Server_Data roundData;
+        roundData.newRound = false;
+        roundData.whatToRead = 2;
+        roundData.gameFound = 2;
+        roundData.playerId = -1;
+
+        // Dirty countdown.
+        if(games[i].timer == 0)
+        {
+          roundData.timeLeft = 3;
+        }
+        else if(games[i].timer == 1)
+        {
+          roundData.timeLeft = 2;
+        }
+        else if(games[i].timer == 2)
+        {
+          roundData.timeLeft = 1;
+        }
+        else if(games[i].timer == 3)
+        {
+          roundData.timeLeft = 0;
+        }
+
+        // Update to clients.
+        if(roundData.timeLeft <= 3)
+        {
+        int w = write(games[i].mainPlayerId, &roundData, sizeof(Server_Data));
+        if(w == -1)
+        {
+          perror("Updating Client 1 failed: ");
+        }
+        w = write(games[i].opponentPlayerId, &roundData, sizeof(Server_Data));
+        if(w == -1)
+        {
+          perror("Updating Client 2 failed: ");
+        }
+        }
+        // Round over calculate results.
+        if(games[i].timer >= 4)
+        {
+          std::cout << "Round over for game with ID: " << i << "\n";
+          games[i].resetTime = true;
+          games[i].timer = 0;
+
+          int winner = stoneSicssorBag(games[i].mainPlayerChoice, games[i].opponentPlayerChoice);
+          
+
+          // Announce winners and losers
+          if(winner == 0)
+          {
+            std::cout << "Game ID: " << i << " Just had a TIE!\n";
+          }
+          else
+          {
+            std::cout << "Winner of GAME ID: " << i << " is player " << winner << " !\n";
+          }
+
+          // Reset choices
+          games[i].mainPlayerChoice = -1;
+          games[i].opponentPlayerChoice = -1;
+        }
+
+        games[i].timer += 1;
+      }
     }
       // write sockets.
       if(FD_ISSET(i, &ready_sockets))
@@ -370,9 +462,23 @@ int main(int argc, char *argv[])
           }
           else
           {
+            
             // Update client.
             std::cout << "Client: " << data.playerId << " wants to join? - " << data.wantToJoin << "\n";
             players[i].isSearching = data.wantToJoin;
+
+            // Update main players choice.
+            if(i == games[players[i].gameID].mainPlayerId)
+            {
+              games[players[i].gameID].mainPlayerChoice = data.selection;
+              std::cout << "Main player choice is: " << data.selection << "\n";
+            }
+            // Update opponent players choice.
+            else if (i == games[players[i].gameID].opponentPlayerId)
+            {
+              games[players[i].gameID].opponentPlayerId = data.selection;
+              std::cout << "Opponent player choice is: " << data.selection << "\n";
+            }
           }
         }
       }
