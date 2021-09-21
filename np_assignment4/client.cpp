@@ -39,6 +39,8 @@ struct Server_Data
   int timeLeft = 0;
 
   bool newRound = false;
+
+  int score = 0;
 };
 
 struct Data
@@ -48,8 +50,6 @@ struct Data
 
   // flags to the server that player wants to join a game.
   int wantToJoin = false;
-
-  bool gameFound = false;
 
   int isSpectator = true;
   // The move selection by the player.
@@ -101,9 +101,10 @@ struct game_data
   int viewerIds[MAX_VIEWER];
 };
 
+Data test;
+
 fd_set current_sockets, ready_sockets;
 int main(int argc, char *argv[]){
-  
   	/* Do magic */
 	if(argc != 2)
   {
@@ -183,9 +184,12 @@ int main(int argc, char *argv[]){
           // input
           if(i == 0)
           {
+            Data data_sel;
             int wr;
             char input[1];
+            system("stty -echo");
             std::cin >> input;
+
             switch(client_state.current_state)
             {
               case 0:
@@ -223,8 +227,6 @@ int main(int argc, char *argv[]){
               case 2:
               break;
               case 3:
-              {
-              Data data_sel;
               if(strcmp(input, "1") == NULL)
               {
                 data_sel.selection = 0;
@@ -259,7 +261,6 @@ int main(int argc, char *argv[]){
               {
                 perror("Failed to Update selection to server: ");
               }
-              }
               break;
               case 4:
               break;
@@ -287,6 +288,13 @@ int main(int argc, char *argv[]){
                 case 2:
                 std::cout << "Seconds Left: " << message.timeLeft << "\n";
                 break;
+                case 3:
+                std::cout << "You won the Round!\nYour score: " << message.score << "\n";
+                break;
+                case 4:
+                std::cout << "You lost the Round!\n our score: " << message.score << "\n";
+                case 5:
+                std::cout << "This round was a TIE!\n";
                 break;
               }
             }

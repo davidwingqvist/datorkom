@@ -33,11 +33,10 @@ struct Data
   // flags to the server that player wants to join a game.
   int wantToJoin = false;
 
-  bool gameFound = false;
-
   int isSpectator = true;
   // The move selection by the player.
   int selection = -1;
+  
 };
 
 struct Server_Data
@@ -50,6 +49,8 @@ struct Server_Data
   int timeLeft = 0;
 
   bool newRound = false;
+
+  int score = 0;
 };
 
 struct player_data
@@ -76,6 +77,9 @@ struct game_data
 
   int mainPlayerChoice = -1;
   int opponentPlayerChoice = -1;
+
+  int mainPlayerScore = 0;
+  int opponentPlayerScore = 0;
 
   // This is 1 if the main player won, 2 if the opposite side won.
   int winnerId = 0;
@@ -312,7 +316,7 @@ int main(int argc, char *argv[])
         players[o].gameID = i;
         int gameID = i;
 
-        std::cout << "GAME ID: " << i;
+        std::cout << "GAME ID: " << i << "\n";
 
         // SETUP game
         games[gameID].nrOfPlayers = 2;
@@ -386,20 +390,7 @@ int main(int argc, char *argv[])
           roundData.timeLeft = 0;
         }
 
-        // Update to clients.
-        if(roundData.timeLeft <= 3)
-        {
-        int w = write(games[i].mainPlayerId, &roundData, sizeof(Server_Data));
-        if(w == -1)
-        {
-          perror("Updating Client 1 failed: ");
-        }
-        w = write(games[i].opponentPlayerId, &roundData, sizeof(Server_Data));
-        if(w == -1)
-        {
-          perror("Updating Client 2 failed: ");
-        }
-        }
+        
         // Round over calculate results.
         if(games[i].timer >= 4)
         {
@@ -413,16 +404,92 @@ int main(int argc, char *argv[])
           // Announce winners and losers
           if(winner == 0)
           {
-            std::cout << "Game ID: " << i << " Just had a TIE!\n";
+            Server_Data tieData;
+            tieData.whatToRead = 5;
+            tieData.playerId = games[i].mainPlayerId;
+            tieData.score = games[i].mainPlayerScore;
+            int writeScore = write(games[i].mainPlayerId, &tieData, sizeof(Server_Data));
+            if(writeScore == -1)
+            {
+              perror("Failed updating end of round to player 1: ");
+            }
+
+            tieData.playerId = games[i].opponentPlayerId;
+            tieData.score = games[i].opponentPlayerScore;
+            writeScore = write(games[i].opponentPlayerId, &tieData, sizeof(Server_Data));
+            if(writeScore == -1)
+            {
+              perror("Failed updating end of round to player 1: ");
+            }
           }
           else
           {
-            std::cout << "Winner of GAME ID: " << i << " is player " << winner << " !\n";
+            Server_Data scoreData;
+            //std::cout << "Winner of GAME ID: " << i << " is player " << winner << " !\n";
+            if(winner == 1) // First player won
+            {
+              games[i].mainPlayerScore++;
+              scoreData.whatToRead = 3;
+              scoreData.playerId = games[i].mainPlayerId;
+              scoreData.score = games[i].mainPlayerScore;
+              int writeScore = write(games[i].mainPlayerId, &scoreData, sizeof(Server_Data));
+              if(writeScore == -1)
+              {
+                perror("Failed updating end of round to player 1: ");
+              }
+
+              scoreData.whatToRead = 4;
+              scoreData.playerId = games[i].opponentPlayerId;
+              scoreData.score = games[i].opponentPlayerScore;
+              writeScore = write(games[i].opponentPlayerId, &scoreData, sizeof(Server_Data));
+              if(writeScore == -1)
+              {
+                perror("Failed updating end of round to player 1: ");
+              }
+            }
+            else // Second player won
+            {
+              games[i].opponentPlayerScore++;
+              scoreData.whatToRead = 4;
+              scoreData.playerId = games[i].mainPlayerId;
+              scoreData.score = games[i].mainPlayerScore;
+              int writeScore = write(games[i].mainPlayerId, &scoreData, sizeof(Server_Data));
+              if(writeScore == -1)
+              {
+                perror("Failed updating end of round to player 1: ");
+              }
+
+              scoreData.whatToRead = 3;
+              scoreData.playerId = games[i].opponentPlayerId;
+              scoreData.score = games[i].opponentPlayerScore;
+              writeScore = write(games[i].opponentPlayerId, &scoreData, sizeof(Server_Data));
+              if(writeScore == -1)
+              {
+                perror("Failed updating end of round to player 1: ");
+              }
+            }
           }
+
+          
 
           // Reset choices
           games[i].mainPlayerChoice = -1;
           games[i].opponentPlayerChoice = -1;
+        }
+
+        // Update to clients.
+        if(roundData.timeLeft <= 3)
+        {
+        int w = write(games[i].mainPlayerId, &roundData, sizeof(Server_Data));
+        if(w == -1)
+        {
+          perror("Updating Client 1 failed: ");
+        }
+        w = write(games[i].opponentPlayerId, &roundData, sizeof(Server_Data));
+        if(w == -1)
+        {
+          perror("Updating Client 2 failed: ");
+        }
         }
 
         games[i].timer += 1;
@@ -458,14 +525,20 @@ int main(int argc, char *argv[])
             players[i].playerId = -1;
             FD_CLR(i, &current_sockets);
             close(i);
+
+            game_data newData;
+            games[i] = newData;
             continue;
           }
           else
           {
             
-            // Update client.
-            std::cout << "Client: " << data.playerId << " wants to join? - " << data.wantToJoin << "\n";
-            players[i].isSearching = data.wantToJoin;
+            if(data.wantToJoin < 2)
+            {
+              // Update client.
+              std::cout << "Client: " << data.playerId << " wants to join? - " << data.wantToJoin << "\n";
+              players[i].isSearching = data.wantToJoin;
+            }
 
             // Update main players choice.
             if(i == games[players[i].gameID].mainPlayerId)
@@ -476,7 +549,7 @@ int main(int argc, char *argv[])
             // Update opponent players choice.
             else if (i == games[players[i].gameID].opponentPlayerId)
             {
-              games[players[i].gameID].opponentPlayerId = data.selection;
+              games[players[i].gameID].opponentPlayerChoice = data.selection;
               std::cout << "Opponent player choice is: " << data.selection << "\n";
             }
           }
