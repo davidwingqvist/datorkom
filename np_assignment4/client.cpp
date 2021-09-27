@@ -19,6 +19,8 @@
 #define STDIN 0
 #define MAX_VIEWER 128
 
+bool canMakeMove = false;
+
 void MainMenu();
 void ChooseGameMenu();
 void SearchingForGame();
@@ -26,16 +28,16 @@ void selectMoveScreen();
 
 struct Server_Data
 {
-// WhatToRead = -1
+  // WhatToRead = -1
   int playerId = -1;
 
-// Specifies what to read in this package.
+  // Specifies what to read in this package.
   int whatToRead = -1;
 
-// WhatToRead = 0
+  // WhatToRead = 0
   bool gameFound = false;
 
-// WhatToRead = 1
+  // WhatToRead = 1
   int timeLeft = 0;
 
   bool newRound = false;
@@ -54,7 +56,6 @@ struct Data
   int isSpectator = true;
   // The move selection by the player.
   int selection = -1;
-  
 };
 
 Data SendDataToServer(int id, int isSpectator, int selection);
@@ -72,7 +73,7 @@ struct state
   int playerId = -1;
   int current_state = 0;
   bool isSpectator = false;
-}client_state;
+} client_state;
 
 struct player_data
 {
@@ -104,17 +105,18 @@ struct game_data
 Data test;
 
 fd_set current_sockets, ready_sockets;
-int main(int argc, char *argv[]){
-  	/* Do magic */
-	if(argc != 2)
+int main(int argc, char *argv[])
+{
+  /* Do magic */
+  if (argc != 2)
   {
     printf("ONLY 2 ARGUMENTS ARE ACCEPTED\n PROGRAM IP:PORT\n");
     exit(0);
   }
 
   struct addrinfo hints, *servinfo, *p;
-  char* address = strtok(argv[1], ":");
-  char* port = strtok(NULL, "");
+  char *address = strtok(argv[1], ":");
+  char *port = strtok(NULL, "");
 
   printf("Host %s ", address);
   printf("and port %s\n", port);
@@ -124,33 +126,33 @@ int main(int argc, char *argv[]){
   hints.ai_flags = AI_CANONNAME;
 
   int rv;
-  if((rv = getaddrinfo(address, port, &hints, &servinfo)) != 0)
+  if ((rv = getaddrinfo(address, port, &hints, &servinfo)) != 0)
   {
-      perror("Address info");
-      exit(0);
+    perror("Address info");
+    exit(0);
   }
 
   int sockfd;
-  for(p = servinfo; p != NULL; p = p->ai_next)
+  for (p = servinfo; p != NULL; p = p->ai_next)
   {
-      if((sockfd = socket(p->ai_family, p->ai_socktype,
-                        p->ai_protocol)) == -1)
-      {
-        perror("Listener : Socket");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-        continue;
-      }
+    if ((sockfd = socket(p->ai_family, p->ai_socktype,
+                         p->ai_protocol)) == -1)
+    {
+      perror("Listener : Socket");
+      close(sockfd);
+      exit(EXIT_FAILURE);
+      continue;
+    }
 
-      if(connect(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-      {
-        close(sockfd);
-        perror("Listener : Connect");
-        exit(EXIT_FAILURE);
-        continue;
-      }
+    if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+    {
+      close(sockfd);
+      perror("Listener : Connect");
+      exit(EXIT_FAILURE);
+      continue;
+    }
 
-      break;
+    break;
   }
 
   FD_ZERO(&current_sockets);
@@ -161,28 +163,28 @@ int main(int argc, char *argv[]){
 
   MainMenu();
 
-  while(1)
+  while (1)
   {
     ready_sockets = current_sockets;
     int sel = select(FD_SETSIZE, &ready_sockets, NULL, NULL, NULL);
-    switch(sel)
+    switch (sel)
     {
-      case 0:
+    case 0:
       // Timeout.
       exit(EXIT_FAILURE);
       break;
-      case -1:
+    case -1:
       std::cout << "Timeout from server.\n";
       exit(EXIT_FAILURE);
       break;
-      default:
+    default:
 
-      for(int i = 0; i < FD_SETSIZE; i++)
+      for (int i = 0; i < FD_SETSIZE; i++)
       {
-        if(FD_ISSET(i, &ready_sockets))
+        if (FD_ISSET(i, &ready_sockets))
         {
           // input
-          if(i == 0)
+          if (i == 0)
           {
             Data data_sel;
             int wr;
@@ -190,10 +192,10 @@ int main(int argc, char *argv[]){
             system("stty -echo");
             std::cin >> input;
 
-            switch(client_state.current_state)
+            switch (client_state.current_state)
             {
-              case 0:
-              if(strcmp(input, "0") == NULL)
+            case 0:
+              if (strcmp(input, "0") == NULL)
               {
                 client_state.current_state = 1;
                 client_state.isSpectator = false;
@@ -207,94 +209,105 @@ int main(int argc, char *argv[]){
                 data.selection = -1;
 
                 int wr = write(sockfd, &data, sizeof(data));
-                if(wr == -1)
+                if (wr == -1)
                   std::cout << "Sending Join request to server failed.\n";
               }
-              else if(strcmp(input, "1") == NULL)
+              else if (strcmp(input, "1") == NULL)
               {
                 client_state.current_state = 2;
                 client_state.isSpectator = true;
                 ChooseGameMenu();
               }
-              else if(strcmp(input, "2") == NULL)
+              else if (strcmp(input, "2") == NULL)
               {
                 close(sockfd);
                 exit(EXIT_SUCCESS);
               }
               break;
-              case 1:
+            case 1:
               break;
-              case 2:
+            case 2:
               break;
-              case 3:
-              if(strcmp(input, "1") == NULL)
+            case 3:
+
+              if (canMakeMove)
               {
-                data_sel.selection = 0;
-                data_sel.playerId = client_state.playerId;
-                data_sel.isSpectator = false;
-                data_sel.wantToJoin = 2;
-              }
-              else if(strcmp(input, "2") == NULL)
-              {
-                data_sel.selection = 1;
-                data_sel.playerId = client_state.playerId;
-                data_sel.isSpectator = false;
-                data_sel.wantToJoin = 2;
-              }
-              else if(strcmp(input, "3") == NULL)
-              {
-                data_sel.selection = 2;
-                data_sel.playerId = client_state.playerId;
-                data_sel.isSpectator = false;
-                data_sel.wantToJoin = 2;
-              }
-              else
-              {
-                data_sel.selection = -1;
-                data_sel.playerId = client_state.playerId;
-                data_sel.isSpectator = false;
-                data_sel.wantToJoin = 2;
+                if (strcmp(input, "1") == NULL)
+                {
+                  data_sel.selection = 0;
+                  data_sel.playerId = client_state.playerId;
+                  data_sel.isSpectator = false;
+                  data_sel.wantToJoin = 2;
+                  canMakeMove = false;
+                }
+                else if (strcmp(input, "2") == NULL)
+                {
+                  data_sel.selection = 1;
+                  data_sel.playerId = client_state.playerId;
+                  data_sel.isSpectator = false;
+                  data_sel.wantToJoin = 2;
+                  canMakeMove = false;
+                }
+                else if (strcmp(input, "3") == NULL)
+                {
+                  data_sel.selection = 2;
+                  data_sel.playerId = client_state.playerId;
+                  data_sel.isSpectator = false;
+                  data_sel.wantToJoin = 2;
+                  canMakeMove = false;
+                }
+                else
+                {
+                  data_sel.selection = -1;
+                  data_sel.playerId = client_state.playerId;
+                  data_sel.isSpectator = false;
+                  data_sel.wantToJoin = 2;
+                  canMakeMove = false;
+                }
               }
 
               wr = write(sockfd, &data_sel, sizeof(Data));
-              if(wr == -1)
+              if (wr == -1)
               {
                 perror("Failed to Update selection to server: ");
               }
               break;
-              case 4:
+            case 4:
               break;
             }
-
           }
           // Read for messages.
-          else if(i == sockfd)
+          else if (i == sockfd)
           {
             Server_Data message;
             int r = read(sockfd, &message, sizeof(message));
-            if(r > 0)
+            if (r > 0)
             {
 
-              switch(message.whatToRead)
+              switch (message.whatToRead)
               {
-                case -1:
+              case -1:
                 client_state.playerId = message.playerId;
                 std::cout << "Current ID: " << client_state.playerId << ".\n";
                 break;
-                case 0:
+              case 0:
                 std::cout << "Game has been found!\n";
                 client_state.current_state = 3;
-                selectMoveScreen();
-                case 2:
+              case 2:
                 std::cout << "Seconds Left: " << message.timeLeft << "\n";
                 break;
-                case 3:
+              case 3:
                 std::cout << "You won the Round!\nYour score: " << message.score << "\n";
                 break;
-                case 4:
+              case 4:
                 std::cout << "You lost the Round!\n our score: " << message.score << "\n";
-                case 5:
+              case 5:
                 std::cout << "This round was a TIE!\n";
+                break;
+              case 6:
+                // Make a move.
+                selectMoveScreen();
+                canMakeMove = true;
                 break;
               }
             }
@@ -311,12 +324,10 @@ int main(int argc, char *argv[]){
 
       break;
     }
-	  
   }
 
   close(sockfd);
   return EXIT_SUCCESS;
-
 }
 
 void MainMenu()
@@ -332,7 +343,7 @@ void ChooseGameMenu()
   std::cout << "Please choosing one of the following available games.\n";
   std::cout << "TIP - To watch a game simply press the associated number and confirm with enter.\n";
 
-  // std::cout << [ << i << ] << " Ongoing: " << player1.score << " - " << player2.score << "\n"; 
+  // std::cout << [ << i << ] << " Ongoing: " << player1.score << " - " << player2.score << "\n";
 }
 
 void selectMoveScreen()
