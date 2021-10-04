@@ -15,9 +15,11 @@
 #include <iostream>
 #include <string>
 #include <regex.h>
+#include <chrono>
 
 #define STDIN 0
 #define MAX_VIEWER 128
+#define MAX_GAMES 9
 
 bool canMakeMove = false;
 
@@ -25,6 +27,46 @@ void MainMenu();
 void ChooseGameMenu();
 void SearchingForGame();
 void selectMoveScreen();
+
+struct compressed_game
+{
+  int main = 0;
+  int opp = 0;
+  int id = -1;
+};
+
+struct availableGame
+{
+  int games[FD_SETSIZE] = {-1};
+};
+
+struct game_data
+{
+  // Check if the game is filled with 2 players yet.
+  int nrOfPlayers = 0;
+
+  int mainPlayerChoice = -1;
+  int opponentPlayerChoice = -1;
+
+  int mainPlayerScore = 0;
+  int opponentPlayerScore = 0;
+
+  // This is 1 if the main player won, 2 if the opposite side won.
+  int winnerId = 0;
+
+  int mainPlayerId = -1;
+  int opponentPlayerId = -1;
+  int viewerIds[MAX_VIEWER] = {0};
+
+  std::chrono::steady_clock::time_point startTime;
+  std::chrono::steady_clock::time_point choiceStartTime;
+  bool resetTime = true;
+  int timer = 1;
+  float mainPlayerRespTime = 0.0f;
+  float opponentRespTime = 0.0f;
+  int totalRounds = 0;
+  bool isChoiceRound = false;
+};
 
 struct Server_Data
 {
@@ -43,6 +85,8 @@ struct Server_Data
   bool newRound = false;
 
   int score = 0;
+
+  compressed_game games[MAX_GAMES];
 };
 
 struct Data
@@ -52,6 +96,8 @@ struct Data
 
   // flags to the server that player wants to join a game.
   int wantToJoin = false;
+
+  int wantToSpectate = false;
 
   int isSpectator = true;
   // The move selection by the player.
@@ -89,19 +135,6 @@ struct game_player_data
   int current_choice = 0;
 };
 
-struct game_data
-{
-  // Check if the game is filled with 2 players yet.
-  int nrOfPlayers = 0;
-
-  // This is 1 if the main player won, 2 if the opposite side won.
-  int winnerId = 0;
-
-  int mainPlayerId = -1;
-  int opponentPlayerId = -1;
-  int viewerIds[MAX_VIEWER];
-};
-
 Data test;
 
 fd_set current_sockets, ready_sockets;
@@ -114,6 +147,7 @@ int main(int argc, char *argv[])
     exit(0);
   }
 
+  availableGame games;
   struct addrinfo hints, *servinfo, *p;
   char *address = strtok(argv[1], ":");
   char *port = strtok(NULL, "");
@@ -217,6 +251,11 @@ int main(int argc, char *argv[])
                 client_state.current_state = 2;
                 client_state.isSpectator = true;
                 ChooseGameMenu();
+
+                Data d;
+                d.wantToSpectate = true;
+                d.playerId = client_state.playerId;
+                write(sockfd, &d, sizeof(Data));
               }
               else if (strcmp(input, "2") == NULL)
               {
@@ -227,6 +266,21 @@ int main(int argc, char *argv[])
             case 1:
               break;
             case 2:
+              // Spectate game scene.
+              for (int i = 0; i < 9; i++)
+              {
+                if (strcmp(input, std::string(std::to_string(i)).c_str()) == NULL)
+                {
+                  if (games.games[i] == 1)
+                  {
+                    Data dl;
+                    dl.playerId = client_state.playerId;
+                    dl.selection = i;
+
+                    write(sockfd, &dl, sizeof(Data));
+                  }
+                }
+              }
               break;
             case 3:
 
@@ -293,6 +347,11 @@ int main(int argc, char *argv[])
               case 0:
                 std::cout << "Game has been found!\n";
                 client_state.current_state = 3;
+                break;
+              case 1:
+                MainMenu();
+                client_state.current_state = 0;
+                break;
               case 2:
                 std::cout << "Seconds Left: " << message.timeLeft << "\n";
                 break;
@@ -303,11 +362,31 @@ int main(int argc, char *argv[])
                 std::cout << "You lost the Round!\n our score: " << message.score << "\n";
               case 5:
                 std::cout << "This round was a TIE!\n";
+                std::cout << "Your score: " << message.score << "\n";
                 break;
               case 6:
                 // Make a move.
                 selectMoveScreen();
                 canMakeMove = true;
+                break;
+              case 7:
+                std::cout << "You lost the game!\n";
+                MainMenu();
+                client_state.current_state = 0;
+                break;
+              case 8:
+                std::cout << "You won the game!\n";
+                MainMenu();
+                client_state.current_state = 0;
+                break;
+              case 10:
+                //print out all games.
+                for (int i = 0; i < 9; i++)
+                {
+                  std::cout << "Game " << i << ": Player 1 - " << message.games[i].main << " against ";
+                  std::cout << message.games[i].opp << " - Player 2\n";
+                  games.games[i] = 1;
+                }
                 break;
               }
             }

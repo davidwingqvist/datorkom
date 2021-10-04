@@ -25,48 +25,12 @@
 #define MAX_PLAYERS FD_SETSIZE
 #define MAX_VIEWER 128
 #define MAX_GAMES 9
-struct Data
+
+struct compressed_game
 {
-  // Check the id of the player.
-  int playerId = -1;
-
-  // flags to the server that player wants to join a game.
-  int wantToJoin = false;
-
-  int isSpectator = true;
-  // The move selection by the player.
-  int selection = -1;
-};
-
-struct Server_Data
-{
-  int playerId = -1;
-  int whatToRead = -1;
-
-  bool gameFound = false;
-
-  int timeLeft = 0;
-
-  bool newRound = false;
-
-  int score = 0;
-};
-
-struct player_data
-{
-  int playerId = -1;
-  bool isSpectator = false;
-  int isSearching = false;
-  int playerSocket = -1;
-  int gameID = -1;
-};
-
-struct game_player_data
-{
-  player_data player;
-  int score = 0;
-  // 1 - scissor, 2 - Stone, 3 - Paper, 0 == No choice was made.
-  int current_choice = 0;
+  int main = 0;
+  int opp = 0;
+  int id = -1;
 };
 
 struct game_data
@@ -95,6 +59,54 @@ struct game_data
   float opponentRespTime = 0.0f;
   int totalRounds = 0;
   bool isChoiceRound = false;
+};
+
+struct Data
+{
+  // Check the id of the player.
+  int playerId = -1;
+
+  // flags to the server that player wants to join a game.
+  int wantToJoin = false;
+
+  int wantToSpectate = false;
+
+  int isSpectator = true;
+  // The move selection by the player.
+  int selection = -1;
+};
+
+struct Server_Data
+{
+  int playerId = -1;
+  int whatToRead = -1;
+
+  bool gameFound = false;
+
+  int timeLeft = 0;
+
+  bool newRound = false;
+
+  int score = 0;
+  
+  compressed_game games[MAX_GAMES];
+};
+
+struct player_data
+{
+  int playerId = -1;
+  bool isSpectator = false;
+  int isSearching = false;
+  int playerSocket = -1;
+  int gameID = -1;
+};
+
+struct game_player_data
+{
+  player_data player;
+  int score = 0;
+  // 1 - scissor, 2 - Stone, 3 - Paper, 0 == No choice was made.
+  int current_choice = 0;
 };
 
 player_data players[FD_SETSIZE];
@@ -264,8 +276,6 @@ int main(int argc, char *argv[])
   FD_SET(sockfd, &current_sockets);
 
   freeaddrinfo(servinfo);
-  //int flags = fcntl(connfd, F_GETFL, 0);
-  //fcntl(connfd, F_SETFL, flags | O_NONBLOCK);
 
   socklen_t len = sizeof cli;
   struct itimerval alarmTime;
@@ -355,6 +365,45 @@ int main(int argc, char *argv[])
         if (games[i].nrOfPlayers == 2)
         {
 
+          // On player win game.
+          if (games[i].mainPlayerScore >= 3 || games[i].opponentPlayerScore >= 3)
+          {
+            int main = games[i].mainPlayerScore;
+            int opp = games[i].opponentPlayerScore;
+            if (main >= 3)
+            {
+              // Main player win.
+              Server_Data winGame;
+              winGame.whatToRead = 8;
+
+              write(games[i].mainPlayerId, &winGame, sizeof(Server_Data));
+
+              winGame.whatToRead = 7;
+              write(games[i].opponentPlayerId, &winGame, sizeof(Server_Data));
+            }
+            else if (opp >= 3)
+            {
+              // Opponent win.
+              Server_Data winGame;
+              winGame.whatToRead = 7;
+
+              write(games[i].mainPlayerId, &winGame, sizeof(Server_Data));
+
+              winGame.whatToRead = 8;
+              write(games[i].opponentPlayerId, &winGame, sizeof(Server_Data));
+            }
+
+            // Print out reaction times on server.
+            std::cout << "------------------------------------\n";
+            std::cout << "Reaction times for Game with ID: " << i << "\n";
+            std::cout << "Main player " << games[i].mainPlayerId << ": " << abs(games[i].mainPlayerRespTime / games[i].totalRounds) << ".\n";
+            std::cout << "Opponent player " << games[i].opponentPlayerId << ": " << abs(games[i].opponentRespTime / games[i].totalRounds) << ".\n";
+            std::cout << "------------------------------------\n";
+            // Reset game.
+            game_data newGame;
+            games[i] = newGame;
+          }
+
           // On new Round
           if (games[i].resetTime)
           {
@@ -437,6 +486,8 @@ int main(int argc, char *argv[])
               games[i].totalRounds++;
 
               int winner = stoneSicssorBag(games[i].mainPlayerChoice, games[i].opponentPlayerChoice);
+              games[i].mainPlayerChoice = -1;
+              games[i].opponentPlayerChoice = -1;
 
               // Announce winners and losers
               if (winner == 0)
@@ -508,139 +559,6 @@ int main(int argc, char *argv[])
               }
             }
           }
-          /*
-      // Calculate if a second has gone since last second or round start.
-      if(abs(elap.count() - 0.001f) >= games[i].timer)
-      {
-        Server_Data roundData;
-        roundData.newRound = false;
-        roundData.whatToRead = 2;
-        roundData.gameFound = 2;
-        roundData.playerId = -1;
-
-        // Dirty countdown.
-        if(games[i].timer == 0)
-        {
-          roundData.timeLeft = 3;
-        }
-        else if(games[i].timer == 1)
-        {
-          roundData.timeLeft = 2;
-        }
-        else if(games[i].timer == 2)
-        {
-          roundData.timeLeft = 1;
-        }
-        else if(games[i].timer == 3)
-        {
-          roundData.timeLeft = 0;
-        }
-
-        
-        // Round over calculate results.
-        if(games[i].timer >= 4)
-        {
-          std::cout << "Round over for game with ID: " << i << "\n";
-          games[i].resetTime = true;
-          games[i].timer = 0;
-
-          int winner = stoneSicssorBag(games[i].mainPlayerChoice, games[i].opponentPlayerChoice);
-          
-
-          // Announce winners and losers
-          if(winner == 0)
-          {
-            Server_Data tieData;
-            tieData.whatToRead = 5;
-            tieData.playerId = games[i].mainPlayerId;
-            tieData.score = games[i].mainPlayerScore;
-            int writeScore = write(games[i].mainPlayerId, &tieData, sizeof(Server_Data));
-            if(writeScore == -1)
-            {
-              perror("Failed updating end of round to player 1: ");
-            }
-
-            tieData.playerId = games[i].opponentPlayerId;
-            tieData.score = games[i].opponentPlayerScore;
-            writeScore = write(games[i].opponentPlayerId, &tieData, sizeof(Server_Data));
-            if(writeScore == -1)
-            {
-              perror("Failed updating end of round to player 1: ");
-            }
-          }
-          else
-          {
-            Server_Data scoreData;
-            //std::cout << "Winner of GAME ID: " << i << " is player " << winner << " !\n";
-            if(winner == 1) // First player won
-            {
-              games[i].mainPlayerScore++;
-              scoreData.whatToRead = 3;
-              scoreData.playerId = games[i].mainPlayerId;
-              scoreData.score = games[i].mainPlayerScore;
-              int writeScore = write(games[i].mainPlayerId, &scoreData, sizeof(Server_Data));
-              if(writeScore == -1)
-              {
-                perror("Failed updating end of round to player 1: ");
-              }
-
-              scoreData.whatToRead = 4;
-              scoreData.playerId = games[i].opponentPlayerId;
-              scoreData.score = games[i].opponentPlayerScore;
-              writeScore = write(games[i].opponentPlayerId, &scoreData, sizeof(Server_Data));
-              if(writeScore == -1)
-              {
-                perror("Failed updating end of round to player 1: ");
-              }
-            }
-            else // Second player won
-            {
-              games[i].opponentPlayerScore++;
-              scoreData.whatToRead = 4;
-              scoreData.playerId = games[i].mainPlayerId;
-              scoreData.score = games[i].mainPlayerScore;
-              int writeScore = write(games[i].mainPlayerId, &scoreData, sizeof(Server_Data));
-              if(writeScore == -1)
-              {
-                perror("Failed updating end of round to player 1: ");
-              }
-
-              scoreData.whatToRead = 3;
-              scoreData.playerId = games[i].opponentPlayerId;
-              scoreData.score = games[i].opponentPlayerScore;
-              writeScore = write(games[i].opponentPlayerId, &scoreData, sizeof(Server_Data));
-              if(writeScore == -1)
-              {
-                perror("Failed updating end of round to player 1: ");
-              }
-            }
-          }
-
-          
-
-          // Reset choices
-          games[i].mainPlayerChoice = -1;
-          games[i].opponentPlayerChoice = -1;
-        }
-
-        // Update to clients.
-        if(roundData.timeLeft <= 3)
-        {
-        int w = write(games[i].mainPlayerId, &roundData, sizeof(Server_Data));
-        if(w == -1)
-        {
-          perror("Updating Client 1 failed: ");
-        }
-        w = write(games[i].opponentPlayerId, &roundData, sizeof(Server_Data));
-        if(w == -1)
-        {
-          perror("Updating Client 2 failed: ");
-        }
-        }
-
-        games[i].timer += 1;
-      }
-      */
         }
         // write sockets.
         if (FD_ISSET(i, &ready_sockets))
@@ -672,6 +590,17 @@ int main(int argc, char *argv[])
               players[i].playerId = -1;
               FD_CLR(i, &current_sockets);
               close(i);
+              int opponent = games[players[i].gameID].opponentPlayerId;
+
+              // Message opponent player that game is over.
+              if (opponent > 0)
+              {
+                Server_Data d;
+                d.gameFound = false;
+                d.whatToRead = 1;
+
+                write(opponent, &d, sizeof(Server_Data));
+              }
 
               game_data newData;
               games[i] = newData;
@@ -687,6 +616,28 @@ int main(int argc, char *argv[])
                 players[i].isSearching = data.wantToJoin;
               }
 
+              if(data.wantToSpectate)
+              {
+                std::cout << "Client " << data.playerId << " wants to spectate? - " << data.wantToSpectate << "\n";
+
+                Server_Data s;
+                for(int j = 0; j < 9; j++)
+                {
+                  for(int k = 0; k < 1024; k++)
+                  {
+                    if(games[k].nrOfPlayers > 0)
+                    {
+                      s.games[j].id = k;
+                      s.games[j].main = games[k].mainPlayerScore;
+                      s.games[j].opp = games[k].opponentPlayerScore;
+                    }
+                  }
+                }
+                s.whatToRead = 10;
+
+                write(i, &s, sizeof(Server_Data));
+              }
+
               // Update main players choice.
               if (i == games[players[i].gameID].mainPlayerId)
               {
@@ -696,7 +647,7 @@ int main(int argc, char *argv[])
                 if (games[players[i].gameID].isChoiceRound)
                 {
                   std::chrono::duration<float> elp = games[i].choiceStartTime - clock_time;
-                  games[players[i].gameID].mainPlayerRespTime = elp.count();
+                  games[players[i].gameID].mainPlayerRespTime += elp.count();
                 }
               }
               // Update opponent players choice.
@@ -707,7 +658,7 @@ int main(int argc, char *argv[])
                 if (games[players[i].gameID].isChoiceRound)
                 {
                   std::chrono::duration<float> elp = games[i].choiceStartTime - clock_time;
-                  games[players[i].gameID].opponentRespTime = elp.count();
+                  games[players[i].gameID].opponentRespTime += elp.count();
                 }
               }
             }
