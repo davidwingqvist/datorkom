@@ -31,6 +31,7 @@ struct compressed_game
   int main = 0;
   int opp = 0;
   int id = -1;
+  int active = -1;
 };
 
 struct game_data
@@ -109,6 +110,7 @@ struct game_player_data
   int current_choice = 0;
 };
 
+int amount_of_games = 0;
 player_data players[FD_SETSIZE];
 game_player_data playerData[FD_SETSIZE];
 game_data games[FD_SETSIZE];
@@ -316,6 +318,7 @@ int main(int argc, char *argv[])
           // Opponent found.
           if (o != -1)
           {
+            amount_of_games++;
             std::cout << "Game has been found for " << i << " and " << o << " !\n";
             players[i].isSearching = false;
             players[o].isSearching = false;
@@ -332,6 +335,7 @@ int main(int argc, char *argv[])
             games[gameID].nrOfPlayers = 2;
             games[gameID].mainPlayerId = i;
             games[gameID].opponentPlayerId = o;
+            games[gameID].timer = 1;
 
             // Announce to players that match has been found.
 
@@ -396,12 +400,14 @@ int main(int argc, char *argv[])
             // Print out reaction times on server.
             std::cout << "------------------------------------\n";
             std::cout << "Reaction times for Game with ID: " << i << "\n";
-            std::cout << "Main player " << games[i].mainPlayerId << ": " << abs(games[i].mainPlayerRespTime / games[i].totalRounds) << ".\n";
-            std::cout << "Opponent player " << games[i].opponentPlayerId << ": " << abs(games[i].opponentRespTime / games[i].totalRounds) << ".\n";
+            std::cout << "Main player " << games[i].mainPlayerId << ": " << abs((games[i].mainPlayerRespTime / games[i].totalRounds)) << " milliseconds.\n";
+            std::cout << "Opponent player " << games[i].opponentPlayerId << ": " << abs((games[i].opponentRespTime / games[i].totalRounds)) << " milliseconds.\n";
             std::cout << "------------------------------------\n";
             // Reset game.
             game_data newGame;
             games[i] = newGame;
+            
+            continue;
           }
 
           // On new Round
@@ -455,6 +461,7 @@ int main(int argc, char *argv[])
               roundData.whatToRead = 6;
               games[i].choiceStartTime = std::chrono::steady_clock::now();
               games[i].isChoiceRound = true;
+              //std::cout << "Start of choice round.\n";
             }
 
             int w = write(games[i].mainPlayerId, &roundData, sizeof(Server_Data));
@@ -484,6 +491,20 @@ int main(int argc, char *argv[])
               games[i].resetTime = true;
               games[i].timer = 1;
               games[i].totalRounds++;
+
+              // If no input has been done, add full time to resp time
+              if(games[i].mainPlayerChoice == -1)
+              {
+                //std::cout << "Time before: " << games[i].mainPlayerRespTime << "\n";
+                // 2000ms added to reaction time since no reaction was input so we assume the reaction is 2 seconds.
+                games[i].mainPlayerRespTime += 2000.0f;
+                //std::cout << "Main player Didn't choose.\n" << "Time now: " << games[i].mainPlayerRespTime << "\n";
+              }
+              if(games[i].opponentPlayerChoice == -1)
+              {
+                games[i].opponentRespTime += 2000.0f;
+                std::cout << "Opponent Didn't choose.\n";
+              }
 
               int winner = stoneSicssorBag(games[i].mainPlayerChoice, games[i].opponentPlayerChoice);
               games[i].mainPlayerChoice = -1;
@@ -630,6 +651,14 @@ int main(int argc, char *argv[])
                       s.games[j].id = k;
                       s.games[j].main = games[k].mainPlayerScore;
                       s.games[j].opp = games[k].opponentPlayerScore;
+                      s.games[j].active = 1;
+                    }
+                    else
+                    {
+                      s.games[j].id = -1;
+                      s.games[j].main = -1;
+                      s.games[j].opp = -1;
+                      s.games[j].active = -1;
                     }
                   }
                 }
@@ -637,28 +666,31 @@ int main(int argc, char *argv[])
 
                 write(i, &s, sizeof(Server_Data));
               }
+              clock_time = std::chrono::steady_clock::now();
 
               // Update main players choice.
               if (i == games[players[i].gameID].mainPlayerId)
               {
                 games[players[i].gameID].mainPlayerChoice = data.selection;
-                std::cout << "Main player choice is: " << data.selection << "\n";
+                //std::cout << "Main player choice is: " << data.selection << "\n";
 
                 if (games[players[i].gameID].isChoiceRound)
                 {
-                  std::chrono::duration<float> elp = games[i].choiceStartTime - clock_time;
-                  games[players[i].gameID].mainPlayerRespTime += elp.count();
+                  std::chrono::duration<double, std::milli> elp = clock_time - games[players[i].gameID].choiceStartTime;
+                  games[players[i].gameID].mainPlayerRespTime += abs(elp.count());
+                  //std::cout << "Main player reaction time: " << elp.count() << "\n";
                 }
               }
               // Update opponent players choice.
               else if (i == games[players[i].gameID].opponentPlayerId)
               {
                 games[players[i].gameID].opponentPlayerChoice = data.selection;
-                std::cout << "Opponent player choice is: " << data.selection << "\n";
+                //std::cout << "Opponent player choice is: " << data.selection << "\n";
                 if (games[players[i].gameID].isChoiceRound)
                 {
-                  std::chrono::duration<float> elp = games[i].choiceStartTime - clock_time;
-                  games[players[i].gameID].opponentRespTime += elp.count();
+                  std::chrono::duration<double, std::milli> elp = clock_time - games[players[i].gameID].choiceStartTime;
+                  games[players[i].gameID].opponentRespTime += abs(elp.count());
+                  //std::cout << "Opponent reaction time: " << elp.count() << "\n";
                 }
               }
             }

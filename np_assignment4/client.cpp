@@ -33,6 +33,7 @@ struct compressed_game
   int main = 0;
   int opp = 0;
   int id = -1;
+  int active = -1;
 };
 
 struct availableGame
@@ -383,9 +384,12 @@ int main(int argc, char *argv[])
                 //print out all games.
                 for (int i = 0; i < 9; i++)
                 {
-                  std::cout << "Game " << i << ": Player 1 - " << message.games[i].main << " against ";
-                  std::cout << message.games[i].opp << " - Player 2\n";
-                  games.games[i] = 1;
+                  if (message.games[i].active == 1)
+                  {
+                    std::cout << "Game " << i << ": Player 1 - " << message.games[i].main << " against ";
+                    std::cout << message.games[i].opp << " - Player 2\n";
+                    games.games[i] = 1;
+                  }
                 }
                 break;
               }
