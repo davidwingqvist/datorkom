@@ -28,6 +28,17 @@ void ChooseGameMenu();
 void SearchingForGame();
 void selectMoveScreen();
 
+struct _player
+{
+  int id = -1;
+  float time = 2001.0f;
+};
+
+struct _highscore
+{
+  _player scores[5];
+};
+
 struct compressed_game
 {
   int main = 0;
@@ -88,6 +99,7 @@ struct Server_Data
   int score = 0;
 
   compressed_game games[MAX_GAMES];
+  _highscore scores;
 };
 
 struct Data
@@ -103,6 +115,8 @@ struct Data
   int isSpectator = true;
   // The move selection by the player.
   int selection = -1;
+
+  int wantHighScore = false;
 };
 
 Data SendDataToServer(int id, int isSpectator, int selection);
@@ -224,6 +238,7 @@ int main(int argc, char *argv[])
             Data data_sel;
             int wr;
             char input[1];
+            // Hide echo
             system("stty -echo");
             std::cin >> input;
 
@@ -263,8 +278,23 @@ int main(int argc, char *argv[])
                 close(sockfd);
                 exit(EXIT_SUCCESS);
               }
+              else if (strcmp(input, "3") == NULL)
+              {
+                client_state.current_state = 1;
+                Data dp;
+                dp.wantHighScore = true;
+                dp.wantToJoin = false;
+                dp.playerId = client_state.playerId;
+                write(sockfd, &dp, sizeof(Data));
+              }
               break;
             case 1:
+              // Watch highscore.
+              if(strcmp(input, "0") == NULL)
+              {
+                client_state.current_state = 0;
+                MainMenu();
+              }
               break;
             case 2:
               // Spectate game scene.
@@ -281,6 +311,11 @@ int main(int argc, char *argv[])
                     write(sockfd, &dl, sizeof(Data));
                   }
                 }
+              }
+              if(getchar())
+              {
+                client_state.current_state = 0;
+                MainMenu();
               }
               break;
             case 3:
@@ -346,7 +381,7 @@ int main(int argc, char *argv[])
                 std::cout << "Current ID: " << client_state.playerId << ".\n";
                 break;
               case 0:
-                std::cout << "Game has been found!\n";
+                //std::cout << "Game has been found!\n";
                 client_state.current_state = 3;
                 break;
               case 1:
@@ -380,7 +415,19 @@ int main(int argc, char *argv[])
                 MainMenu();
                 client_state.current_state = 0;
                 break;
+              case 9:
+                std::cout << "Highscore board!\n";
+                for (int i = 0; i < 5; i++)
+                {
+                  if (message.scores.scores[i].id == -1)
+                    std::cout << "Empty spot!\n";
+                  else
+                    std::cout << "ID: " << message.scores.scores[i].id << " with " << message.scores.scores[i].time << " ms reaction time!\n";
+                }
+                std::cout << "Press [0] to return.\n";
+                break;
               case 10:
+                client_state.current_state = 2;
                 //print out all games.
                 for (int i = 0; i < 9; i++)
                 {
@@ -418,7 +465,7 @@ void MainMenu()
   std::cout << "Welcome to the Rock, Paper, Scissor Game!\n";
   std::cout << "Please choose one of the options below.\n";
 
-  std::cout << "[0] - Join a Game.\n[1] - Spectate a Game.\n[2] - Quit Game\n";
+  std::cout << "[0] - Join a Game.\n[1] - Spectate a Game.\n[2] - Quit Game\n[3] - Highscore List\n";
 }
 
 void ChooseGameMenu()

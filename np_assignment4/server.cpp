@@ -21,10 +21,22 @@
 #include <regex.h>
 #include <vector>
 #include <chrono>
+#include <algorithm>
 
 #define MAX_PLAYERS FD_SETSIZE
 #define MAX_VIEWER 128
 #define MAX_GAMES 9
+
+struct _player
+{
+  int id = -1;
+  float time = 2001.0f;
+};
+
+struct _highscore
+{
+  _player scores[5];
+};
 
 struct compressed_game
 {
@@ -75,6 +87,8 @@ struct Data
   int isSpectator = true;
   // The move selection by the player.
   int selection = -1;
+
+  int wantHighScore = false;
 };
 
 struct Server_Data
@@ -89,8 +103,9 @@ struct Server_Data
   bool newRound = false;
 
   int score = 0;
-  
+
   compressed_game games[MAX_GAMES];
+  _highscore scores;
 };
 
 struct player_data
@@ -114,6 +129,13 @@ int amount_of_games = 0;
 player_data players[FD_SETSIZE];
 game_player_data playerData[FD_SETSIZE];
 game_data games[FD_SETSIZE];
+_player p_players[FD_SETSIZE];
+_highscore high_score;
+
+bool compare(const _player &a, const _player &b)
+{
+  return a.time < b.time;
+}
 
 int produceID()
 {
@@ -294,7 +316,6 @@ int main(int argc, char *argv[])
     ready_sockets = current_sockets;
     handle_sockets = current_sockets;
     int sel = select(FD_SETSIZE, &ready_sockets, &handle_sockets, NULL, NULL);
-
     switch (sel)
     {
     case -1:
@@ -397,16 +418,26 @@ int main(int argc, char *argv[])
               write(games[i].opponentPlayerId, &winGame, sizeof(Server_Data));
             }
 
+            float mainp = abs((games[i].mainPlayerRespTime / games[i].totalRounds));
+            float oppp = abs((games[i].opponentRespTime / games[i].totalRounds));
             // Print out reaction times on server.
             std::cout << "------------------------------------\n";
             std::cout << "Reaction times for Game with ID: " << i << "\n";
-            std::cout << "Main player " << games[i].mainPlayerId << ": " << abs((games[i].mainPlayerRespTime / games[i].totalRounds)) << " milliseconds.\n";
-            std::cout << "Opponent player " << games[i].opponentPlayerId << ": " << abs((games[i].opponentRespTime / games[i].totalRounds)) << " milliseconds.\n";
+            std::cout << "Main player " << games[i].mainPlayerId << ": " << mainp << " milliseconds.\n";
+            std::cout << "Opponent player " << games[i].opponentPlayerId << ": " << oppp << " milliseconds.\n";
             std::cout << "------------------------------------\n";
+            p_players[games[i].mainPlayerId].id = games[i].mainPlayerId;
+            p_players[games[i].mainPlayerId].time = mainp;
+            p_players[games[i].opponentPlayerId].id = games[i].opponentPlayerId;
+            p_players[games[i].opponentPlayerId].time = oppp;
+
+            //std::cout << "Player: " << p_players[games[i].mainPlayerId].id << " time: " << p_players[games[i].mainPlayerId].time << "\n";
+            //std::cout << "Player: " << p_players[games[i].opponentPlayerId].id << " time: " << p_players[games[i].opponentPlayerId].time << "\n";
+
             // Reset game.
             game_data newGame;
             games[i] = newGame;
-            
+
             continue;
           }
 
@@ -493,14 +524,14 @@ int main(int argc, char *argv[])
               games[i].totalRounds++;
 
               // If no input has been done, add full time to resp time
-              if(games[i].mainPlayerChoice == -1)
+              if (games[i].mainPlayerChoice == -1)
               {
                 //std::cout << "Time before: " << games[i].mainPlayerRespTime << "\n";
                 // 2000ms added to reaction time since no reaction was input so we assume the reaction is 2 seconds.
                 games[i].mainPlayerRespTime += 2000.0f;
                 //std::cout << "Main player Didn't choose.\n" << "Time now: " << games[i].mainPlayerRespTime << "\n";
               }
-              if(games[i].opponentPlayerChoice == -1)
+              if (games[i].opponentPlayerChoice == -1)
               {
                 games[i].opponentRespTime += 2000.0f;
                 std::cout << "Opponent Didn't choose.\n";
@@ -629,29 +660,55 @@ int main(int argc, char *argv[])
             }
             else
             {
+              // Send over the highscore board to player.
+              if (data.wantHighScore)
+              {
+                std::cout << "Requested Highscore\n";
+                Server_Data sd;
+                sd.whatToRead = 9;
 
-              if (data.wantToJoin < 2)
+                /*
+                for(int l = 0; l < 1024; l++)
+                {
+                  std::cout << p_players[l].id << " " << p_players[l].time << "\n";
+                }
+                */
+
+                // Update highscore list
+                std::sort(p_players, p_players + 1024, compare);
+                for (int ij = 0; ij < 5; ij++)
+                {
+                  sd.scores.scores[ij] = p_players[ij];
+                }
+
+                write(i, &sd, sizeof(Server_Data));
+              }
+
+              players[i].isSearching = false;
+              if (data.wantToJoin)
               {
                 // Update client.
                 std::cout << "Client: " << data.playerId << " wants to join? - " << data.wantToJoin << "\n";
                 players[i].isSearching = data.wantToJoin;
               }
 
-              if(data.wantToSpectate)
+
+              if (data.wantToSpectate)
               {
                 std::cout << "Client " << data.playerId << " wants to spectate? - " << data.wantToSpectate << "\n";
 
                 Server_Data s;
-                for(int j = 0; j < 9; j++)
+                for (int j = 0; j < 9; j++)
                 {
-                  for(int k = 0; k < 1024; k++)
+                  for (int k = 0; k < 1024; k++)
                   {
-                    if(games[k].nrOfPlayers > 0)
+                    if (games[k].nrOfPlayers > 0)
                     {
                       s.games[j].id = k;
                       s.games[j].main = games[k].mainPlayerScore;
                       s.games[j].opp = games[k].opponentPlayerScore;
                       s.games[j].active = 1;
+                      break;
                     }
                     else
                     {
