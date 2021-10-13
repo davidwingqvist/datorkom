@@ -131,6 +131,7 @@ game_player_data playerData[FD_SETSIZE];
 game_data games[FD_SETSIZE];
 _player p_players[FD_SETSIZE];
 _highscore high_score;
+compressed_game games_info[FD_SETSIZE];
 
 bool compare(const _player &a, const _player &b)
 {
@@ -430,6 +431,9 @@ int main(int argc, char *argv[])
             p_players[games[i].mainPlayerId].time = mainp;
             p_players[games[i].opponentPlayerId].id = games[i].opponentPlayerId;
             p_players[games[i].opponentPlayerId].time = oppp;
+            players[games[i].mainPlayerId].isSearching = false;
+            players[games[i].opponentPlayerId].isSearching = false;
+            games_info[i].active = -1;
 
             //std::cout << "Player: " << p_players[games[i].mainPlayerId].id << " time: " << p_players[games[i].mainPlayerId].time << "\n";
             //std::cout << "Player: " << p_players[games[i].opponentPlayerId].id << " time: " << p_players[games[i].opponentPlayerId].time << "\n";
@@ -444,6 +448,11 @@ int main(int argc, char *argv[])
           // On new Round
           if (games[i].resetTime)
           {
+            games_info[i].id = i;
+            games_info[i].main = games[i].mainPlayerScore;
+            games_info[i].opp = games[i].opponentPlayerScore;
+            games_info[i].active = 1;
+
             games[i].startTime = std::chrono::steady_clock::now();
             games[i].resetTime = false;
 
@@ -675,10 +684,15 @@ int main(int argc, char *argv[])
                 */
 
                 // Update highscore list
-                std::sort(p_players, p_players + 1024, compare);
+                _player temp[1024];
+                for(int ik = 0; ik < 1024; ik++)
+                {
+                  temp[ik] = p_players[ik];
+                }
+                std::sort(temp, temp + 1024, compare);
                 for (int ij = 0; ij < 5; ij++)
                 {
-                  sd.scores.scores[ij] = p_players[ij];
+                  sd.scores.scores[ij] = temp[ij];
                 }
 
                 write(i, &sd, sizeof(Server_Data));
@@ -698,25 +712,13 @@ int main(int argc, char *argv[])
                 std::cout << "Client " << data.playerId << " wants to spectate? - " << data.wantToSpectate << "\n";
 
                 Server_Data s;
-                for (int j = 0; j < 9; j++)
+                int ts = 0;
+                for(int lk = 0; lk < 1024; lk++)
                 {
-                  for (int k = 0; k < 1024; k++)
+                  if(games_info[lk].active == 1)
                   {
-                    if (games[k].nrOfPlayers > 0)
-                    {
-                      s.games[j].id = k;
-                      s.games[j].main = games[k].mainPlayerScore;
-                      s.games[j].opp = games[k].opponentPlayerScore;
-                      s.games[j].active = 1;
-                      break;
-                    }
-                    else
-                    {
-                      s.games[j].id = -1;
-                      s.games[j].main = -1;
-                      s.games[j].opp = -1;
-                      s.games[j].active = -1;
-                    }
+                    s.games[ts] = games_info[lk];
+                    ts++;
                   }
                 }
                 s.whatToRead = 10;

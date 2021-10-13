@@ -16,6 +16,9 @@
 #include <string>
 #include <regex.h>
 #include <chrono>
+#include <termios.h>
+#include <stdbool.h>
+#include <sys/ioctl.h>
 
 #define STDIN 0
 #define MAX_VIEWER 128
@@ -216,6 +219,7 @@ int main(int argc, char *argv[])
   {
     ready_sockets = current_sockets;
     int sel = select(FD_SETSIZE, &ready_sockets, NULL, NULL, NULL);
+
     switch (sel)
     {
     case 0:
@@ -289,8 +293,7 @@ int main(int argc, char *argv[])
               }
               break;
             case 1:
-              // Watch highscore.
-              if(strcmp(input, "0") == NULL)
+              if (strcmp(input, "0") == NULL)
               {
                 client_state.current_state = 0;
                 MainMenu();
@@ -306,16 +309,12 @@ int main(int argc, char *argv[])
                   {
                     Data dl;
                     dl.playerId = client_state.playerId;
+                    dl.wantToSpectate = true;
                     dl.selection = i;
 
                     write(sockfd, &dl, sizeof(Data));
                   }
                 }
-              }
-              if(getchar())
-              {
-                client_state.current_state = 0;
-                MainMenu();
               }
               break;
             case 3:
