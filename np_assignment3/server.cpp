@@ -164,8 +164,8 @@ int main(int argc, char *argv[])
           char data[MAX];
           memset(data, 0, sizeof data);
           
-          std::cout << "Sending over [Hello 1] to client.\n";
-          strncpy(data, "Hello 1\n", MAX);
+          std::cout << "Sending over [HELLO 1] to client.\n";
+          strncpy(data, "HELLO 1", MAX);
           int wr = write(client_socket, &data, strlen(data));
           if(wr == -1)
           {
