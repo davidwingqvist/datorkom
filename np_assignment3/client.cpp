@@ -254,7 +254,7 @@ int handle_connection(char* data)
   {
     return 1;
   }
-  if(compare.find("Hello 1\n") != std::string::npos)
+  if(compare.find("HELLO 1") != std::string::npos)
   {
     return 0;
   }
