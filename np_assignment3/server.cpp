@@ -307,7 +307,7 @@ int main(int argc, char *argv[])
                 strcpy(acceptance, "ERROR\n");
               }
 
-            int acc = write(i, acceptance, sizeof acceptance);
+            int acc = write(i, acceptance, strlen(acceptance));
             if(acc == -1)
               perror("Error sending acceptance : ");
           }

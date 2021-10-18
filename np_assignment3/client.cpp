@@ -201,7 +201,7 @@ int main(int argc, char *argv[]){
                 strcpy(name_pack, "NICK ");
                 strcat(name_pack, user_name);
 
-                int snd = write(sockfd, name_pack, sizeof name_pack);
+                int snd = write(sockfd, name_pack, strlen(name_pack));
                 if(snd == -1)
                   perror("Error sending nickname : ");
               }
@@ -226,7 +226,7 @@ int main(int argc, char *argv[]){
             else
             {
               // Disconnect.
-              memset(message, 0, sizeof message);
+              memset(message, 0, strlen(message));
               std::cout << "Server shutdown.\n";
               close(sockfd);
               exit(EXIT_SUCCESS);
