@@ -130,6 +130,7 @@ struct game_player_data
 };
 
 int amount_of_games = 0;
+int available[FD_SETSIZE] = {0};
 player_data players[FD_SETSIZE];
 game_player_data playerData[FD_SETSIZE];
 spectators specs[FD_SETSIZE];
@@ -240,7 +241,7 @@ int searchForOpponent(int searche)
 {
   for (int i = 0; i < FD_SETSIZE; i++)
   {
-    if (players[i].isSearching && i != searche && players[i].isSpectator == false)
+    if (players[i].isSearching && i != searche && players[i].isSpectator == false && available[i] == 1)
     {
       return i;
     }
@@ -343,6 +344,8 @@ int main(int argc, char *argv[])
       {
         if (players[i].isSearching == 1)
         {
+          players[games[i].mainPlayerId].isSearching = false;
+          players[games[i].opponentPlayerId].isSearching = false;
           int o = searchForOpponent(i);
 
           // Opponent found.
@@ -398,6 +401,8 @@ int main(int argc, char *argv[])
         // Update games.
         if (games[i].nrOfPlayers == 2)
         {
+          players[games[i].mainPlayerId].isSearching = false;
+          players[games[i].opponentPlayerId].isSearching = false;
 
           // On player win game.
           if (games[i].mainPlayerScore >= 3 || games[i].opponentPlayerScore >= 3)
@@ -720,11 +725,12 @@ int main(int argc, char *argv[])
               }
 
               players[i].isSearching = false;
-              if (data.wantToJoin)
+              if (data.wantToJoin == 1)
               {
                 // Update client.
                 //std::cout << "Client: " << data.playerId << " wants to join? - " << data.wantToJoin << "\n";
                 players[i].isSearching = data.wantToJoin;
+                available[i] = 1;
               }
 
               if (data.selection == 999)
