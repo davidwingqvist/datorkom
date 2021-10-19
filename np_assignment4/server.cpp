@@ -45,6 +45,11 @@ struct compressed_game
   int active = -1;
 };
 
+struct spectators
+{
+  int isSpectate = -1;
+};
+
 struct game_data
 {
   // Check if the game is filled with 2 players yet.
@@ -127,6 +132,7 @@ struct game_player_data
 int amount_of_games = 0;
 player_data players[FD_SETSIZE];
 game_player_data playerData[FD_SETSIZE];
+spectators specs[FD_SETSIZE];
 game_data games[FD_SETSIZE];
 _player p_players[FD_SETSIZE];
 _highscore high_score;
@@ -138,7 +144,7 @@ bool compare(const _player &a, const _player &b)
 }
 
 // Updates the view for spectators
-void UpdateSpectators(int* spec, const int& i, const int whatToRead);
+void UpdateSpectators(int *spec, const int &i, const int whatToRead);
 
 int produceID()
 {
@@ -439,6 +445,7 @@ int main(int argc, char *argv[])
 
             //std::cout << "Player: " << p_players[games[i].mainPlayerId].id << " time: " << p_players[games[i].mainPlayerId].time << "\n";
             //std::cout << "Player: " << p_players[games[i].opponentPlayerId].id << " time: " << p_players[games[i].opponentPlayerId].time << "\n";
+            UpdateSpectators(games[i].viewerIds, i, 13);
 
             // Reset game.
             game_data newGame;
@@ -465,7 +472,7 @@ int main(int argc, char *argv[])
             roundData.playerId = -1;
             roundData.timeLeft = 3;
 
-            UpdateSpectators(games[i].viewerIds, i, 1);
+            UpdateSpectators(games[i].viewerIds, i, 11);
 
             int w = write(games[i].mainPlayerId, &roundData, sizeof(Server_Data));
             if (w == -1)
@@ -519,7 +526,7 @@ int main(int argc, char *argv[])
               perror("Updating Client 2 failed: ");
             }
 
-            UpdateSpectators(games[i].viewerIds, i, 1);
+            UpdateSpectators(games[i].viewerIds, i, 11);
 
             games[i].timer++;
           }
@@ -624,6 +631,8 @@ int main(int argc, char *argv[])
                   }
                 }
               }
+
+              UpdateSpectators(games[i].viewerIds, i, 12);
             }
           }
         }
@@ -664,7 +673,7 @@ int main(int argc, char *argv[])
               {
                 Server_Data d;
                 d.gameFound = false;
-                d.whatToRead = 1;
+                d.whatToRead = -2;
 
                 write(opponent, &d, sizeof(Server_Data));
               }
@@ -691,7 +700,7 @@ int main(int argc, char *argv[])
 
                 // Update highscore list
                 _player temp[1024];
-                for(int ik = 0; ik < 1024; ik++)
+                for (int ik = 0; ik < 1024; ik++)
                 {
                   temp[ik] = p_players[ik];
                 }
@@ -704,6 +713,12 @@ int main(int argc, char *argv[])
                 write(i, &sd, sizeof(Server_Data));
               }
 
+              // Stop spectating
+              if (data.selection == 500)
+              {
+                specs[i].isSpectate = -1;
+              }
+
               players[i].isSearching = false;
               if (data.wantToJoin)
               {
@@ -711,7 +726,6 @@ int main(int argc, char *argv[])
                 //std::cout << "Client: " << data.playerId << " wants to join? - " << data.wantToJoin << "\n";
                 players[i].isSearching = data.wantToJoin;
               }
-
 
               if (data.selection == 999)
               {
@@ -721,9 +735,9 @@ int main(int argc, char *argv[])
 
                 Server_Data s;
                 int ts = 0;
-                for(int lk = 0; lk < 1024; lk++)
+                for (int lk = 0; lk < 1024; lk++)
                 {
-                  if(games_info[lk].active == 1)
+                  if (games_info[lk].active == 1)
                   {
                     s.games[ts] = games_info[lk];
                     ts++;
@@ -733,15 +747,16 @@ int main(int argc, char *argv[])
 
                 write(i, &s, sizeof(Server_Data));
               }
-              else if(data.wantToSpectate && data.isSpectator && data.selection != -1)
+              else if (data.wantToSpectate && data.isSpectator && data.selection != -1)
               {
                 // Join the game as spectator
-                for(int xl = 0; xl < MAX_VIEWER; xl++)
+                for (int xl = 0; xl < MAX_VIEWER; xl++)
                 {
-                  if(games[data.selection].viewerIds[xl] == -1)
+                  if (games[data.selection].viewerIds[xl] == -1)
                   {
                     games[data.selection].viewerIds[xl] = i;
                     std::cout << "Player joined " << data.selection << " as spectator!\n";
+                    specs[i].isSpectate = 1;
                     break;
                   }
                 }
@@ -784,13 +799,12 @@ int main(int argc, char *argv[])
   return EXIT_SUCCESS;
 }
 
-void UpdateSpectators(int* spec, const int& i, const int whatToRead)
+void UpdateSpectators(int *spec, const int &i, const int whatToRead)
 {
-
-  for(int j = 0; j < MAX_VIEWER; j++)
+  for (int j = 0; j < MAX_VIEWER; j++)
   {
     // Active spectator found
-    if(spec[j] > 0)
+    if (spec[j] > 0)
     {
       int spectator = spec[j];
       Server_Data d;
@@ -804,10 +818,12 @@ void UpdateSpectators(int* spec, const int& i, const int whatToRead)
       {
         d.timeLeft = 1;
       }
-      else if(games[i].timer == 3)
+      else if (games[i].timer == 3)
       {
         d.timeLeft = 0;
       }
+      else
+        d.timeLeft = 3;
 
       d.whatToRead = whatToRead;
       d.gameFound = false;
@@ -815,13 +831,21 @@ void UpdateSpectators(int* spec, const int& i, const int whatToRead)
       d.scores.scores[0].id = games[i].mainPlayerScore;
       d.scores.scores[1].id = games[i].opponentPlayerScore;
 
-      int w = write(spectator, &d, sizeof(Server_Data));
-      if(w == -1 || w == 0)
+      if (specs[spectator].isSpectate == -1)
       {
         // Disconnect the viewer.
         spec[j] = -1;
-        FD_CLR(spec[j], &current_sockets);
-        close(spectator);
+      }
+      else
+      {
+        int w = write(spectator, &d, sizeof(Server_Data));
+        if (w == -1 || w == 0)
+        {
+          // Disconnect the viewer.
+          spec[j] = -1;
+          FD_CLR(spec[j], &current_sockets);
+          close(spectator);
+        }
       }
     }
   }

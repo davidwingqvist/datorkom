@@ -247,7 +247,7 @@ int main(int argc, char *argv[])
             int wr;
             char input[1];
             // Hide echo
-            system("stty -echo");
+            //system("stty -echo");
             std::cin >> input;
 
             switch (client_state.current_state)
@@ -298,7 +298,7 @@ int main(int argc, char *argv[])
               }
               break;
             case 1:
-              if (strcmp(input, "0") == NULL)
+              if (strcmp(input, "r") == NULL)
               {
                 client_state.current_state = 0;
                 MainMenu();
@@ -320,10 +320,16 @@ int main(int argc, char *argv[])
 
                     write(sockfd, &dl, sizeof(Data));
                     client_state.isSpectator = true;
+                    client_state.current_state = 4;
                   }
                 }
               }
-              
+              if (strcmp(input, "r") == NULL)
+              {
+                client_state.current_state = 0;
+                MainMenu();
+              }
+
               break;
             case 3:
 
@@ -370,6 +376,17 @@ int main(int argc, char *argv[])
               }
               break;
             case 4:
+              if (strcmp(input, "r") == NULL)
+              {
+                client_state.current_state = 0;
+                client_state.isSpectator = false;
+                MainMenu();
+
+                Data stopSpec;
+                stopSpec.selection = 500;
+
+                write(sockfd, &stopSpec, sizeof(Data));
+              }
               break;
             }
           }
@@ -380,92 +397,90 @@ int main(int argc, char *argv[])
             int r = read(sockfd, &message, sizeof(message));
             if (r > 0)
             {
-              if (!client_state.isSpectator)
+              switch (message.whatToRead)
               {
-                switch (message.whatToRead)
-                {
-                case -1:
-                  client_state.playerId = message.playerId;
-                  std::cout << "Current ID: " << client_state.playerId << ".\n";
-                  break;
-                case 0:
-                  //std::cout << "Game has been found!\n";
-                  client_state.current_state = 3;
-                  break;
-                case 1:
-                  MainMenu();
-                  client_state.current_state = 0;
-                  break;
-                case 2:
-                  std::cout << "Seconds Left: " << message.timeLeft << "\n";
-                  break;
-                case 3:
-                  std::cout << "You won the Round!\nYour score: " << message.score << "\n";
-                  fastFix = false;
-                  break;
-                case 4:
-                  std::cout << "You lost the Round!\nYour score: " << message.score << "\n";
-                  fastFix = true;
-                case 5:
-                if(!fastFix)
+              case -1:
+                client_state.playerId = message.playerId;
+                std::cout << "Current ID: " << client_state.playerId << ".\n";
+                break;
+              case 0:
+                //std::cout << "Game has been found!\n";
+                client_state.current_state = 3;
+                break;
+              case -2:
+                MainMenu();
+                client_state.current_state = 0;
+                break;
+              case 2:
+                std::cout << "Seconds Left: " << message.timeLeft << "\n";
+                canMakeMove = false;
+                break;
+              case 3:
+                std::cout << "You won the Round!\nYour score: " << message.score << "\n";
+                fastFix = false;
+                break;
+              case 4:
+                std::cout << "You lost the Round!\nYour score: " << message.score << "\n";
+                fastFix = true;
+              case 5:
+                if (!fastFix)
                 {
                   std::cout << "This round was a TIE!\n";
                   std::cout << "Your score: " << message.score << "\n";
                 }
                 fastFix = !fastFix;
-                  break;
-                case 6:
-                  // Make a move.
-                  selectMoveScreen();
-                  canMakeMove = true;
-                  break;
-                case 7:
-                  std::cout << "You lost the game!\n";
-                  MainMenu();
-                  client_state.current_state = 0;
-                  break;
-                case 8:
-                  std::cout << "You won the game!\n";
-                  MainMenu();
-                  client_state.current_state = 0;
-                  break;
-                case 9:
-                  std::cout << "Highscore board!\n";
-                  for (int i = 0; i < 5; i++)
-                  {
-                    if (message.scores.scores[i].id == -1)
-                      std::cout << "Empty spot!\n";
-                    else
-                      std::cout << "ID: " << message.scores.scores[i].id << " with " << message.scores.scores[i].time << " ms reaction time!\n";
-                  }
-                  std::cout << "Press [0] to return.\n";
-                  break;
-                case 10:
-                  client_state.current_state = 2;
-                  std::cout << "Simply press Enter with no other input to return to MainMenu.\n";
-                  //print out all games.
-                  for (int i = 0; i < 9; i++)
-                  {
-                    if (message.games[i].active == 1)
-                    {
-                      std::cout << "Game " << i << ": Player 1 - " << message.games[i].main << " against ";
-                      std::cout << "Player 2 - " << message.games[i].opp << "\n";
-                    }
-                    games[i] = message.games[i];
-                  }
-                  break;
-                }
-              }
-              else
-              {
-                switch (message.whatToRead)
+                break;
+              case 6:
+                // Make a move.
+                selectMoveScreen();
+                canMakeMove = true;
+                break;
+              case 7:
+                std::cout << "You lost the game!\n";
+                MainMenu();
+                client_state.current_state = 0;
+                break;
+              case 8:
+                std::cout << "You won the game!\n";
+                MainMenu();
+                client_state.current_state = 0;
+                break;
+              case 9:
+                std::cout << "Highscore board!\n";
+                for (int i = 0; i < 5; i++)
                 {
-                case 1:
-                  std::cout << "Time left for players: " << message.timeLeft << "\n";
-                  break;
-                default:
-                  break;
+                  if (message.scores.scores[i].id == -1)
+                    std::cout << "Empty spot!\n";
+                  else
+                    std::cout << "ID: " << message.scores.scores[i].id << " with " << message.scores.scores[i].time << " ms reaction time!\n";
                 }
+                std::cout << "Press [r] and enter to return.\n";
+                break;
+              case 10:
+                client_state.current_state = 2;
+                std::cout << "Simply press 'r' and enter to return to main menu.\n";
+                //print out all games.
+                for (int i = 0; i < 9; i++)
+                {
+                  if (message.games[i].active == 1)
+                  {
+                    std::cout << "Game " << i << ": Player 1 - " << message.games[i].main << " against ";
+                    std::cout << "Player 2 - " << message.games[i].opp << "\n";
+                  }
+                  games[i] = message.games[i];
+                }
+                break;
+              case 11:
+                std::cout << "Time left for players: " << message.timeLeft << "\n";
+                break;
+              case 12:
+                std::cout << "Player 1 score: " << message.scores.scores[0].id << "\n";
+                std::cout << "Player 2 score: " << message.scores.scores[1].id << "\n";
+                break;
+              case 13:
+                MainMenu();
+                client_state.current_state = 0;
+                break;
               }
             }
             else
