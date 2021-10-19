@@ -13,7 +13,6 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <errno.h>
-#include <curses.h>
 #include <sys/time.h>
 #include <string>
 #include <time.h>
@@ -62,7 +61,7 @@ struct game_data
 
   int mainPlayerId = -1;
   int opponentPlayerId = -1;
-  int viewerIds[MAX_VIEWER] = {0};
+  int viewerIds[MAX_VIEWER] = {-1};
 
   std::chrono::steady_clock::time_point startTime;
   std::chrono::steady_clock::time_point choiceStartTime;
@@ -137,6 +136,9 @@ bool compare(const _player &a, const _player &b)
 {
   return a.time < b.time;
 }
+
+// Updates the view for spectators
+void UpdateSpectators(int* spec, const int& i, const int whatToRead);
 
 int produceID()
 {
@@ -351,7 +353,7 @@ int main(int argc, char *argv[])
             players[o].gameID = i;
             int gameID = i;
 
-            std::cout << "GAME ID: " << i << "\n";
+            //std::cout << "GAME ID: " << i << "\n";
 
             // SETUP game
             games[gameID].nrOfPlayers = 2;
@@ -515,6 +517,8 @@ int main(int argc, char *argv[])
               perror("Updating Client 2 failed: ");
             }
 
+            UpdateSpectators(games[i].viewerIds, i, 1);
+
             games[i].timer++;
           }
 
@@ -543,7 +547,7 @@ int main(int argc, char *argv[])
               if (games[i].opponentPlayerChoice == -1)
               {
                 games[i].opponentRespTime += 2000.0f;
-                std::cout << "Opponent Didn't choose.\n";
+                //std::cout << "Opponent Didn't choose.\n";
               }
 
               int winner = stoneSicssorBag(games[i].mainPlayerChoice, games[i].opponentPlayerChoice);
@@ -702,14 +706,16 @@ int main(int argc, char *argv[])
               if (data.wantToJoin)
               {
                 // Update client.
-                std::cout << "Client: " << data.playerId << " wants to join? - " << data.wantToJoin << "\n";
+                //std::cout << "Client: " << data.playerId << " wants to join? - " << data.wantToJoin << "\n";
                 players[i].isSearching = data.wantToJoin;
               }
 
 
-              if (data.wantToSpectate)
+              if (data.selection == 999)
               {
-                std::cout << "Client " << data.playerId << " wants to spectate? - " << data.wantToSpectate << "\n";
+                // List available games to spectate.
+                //std::cout << "Client " << data.playerId << " wants to spectate? - " << data.wantToSpectate << "\n";
+                std::cout << "Request to spectate recieved.\n";
 
                 Server_Data s;
                 int ts = 0;
@@ -724,6 +730,19 @@ int main(int argc, char *argv[])
                 s.whatToRead = 10;
 
                 write(i, &s, sizeof(Server_Data));
+              }
+              else if(data.wantToSpectate && data.isSpectator && data.selection != -1)
+              {
+                // Join the game as spectator
+                for(int xl = 0; xl < MAX_VIEWER; xl++)
+                {
+                  if(games[data.selection].viewerIds[xl] == -1)
+                  {
+                    games[data.selection].viewerIds[xl] = i;
+                    std::cout << "Player joined " << data.selection << " as spectator!\n";
+                    break;
+                  }
+                }
               }
               clock_time = std::chrono::steady_clock::now();
 
@@ -761,4 +780,44 @@ int main(int argc, char *argv[])
 
   close(sockfd);
   return EXIT_SUCCESS;
+}
+
+void UpdateSpectators(int* spec, const int& i, const int whatToRead)
+{
+
+  for(int j = 0; j < MAX_VIEWER; j++)
+  {
+    // Active spectator found
+    if(spec[j] > 0)
+    {
+      int spectator = spec[j];
+      Server_Data d;
+
+      // Dirty countdown.
+      if (games[i].timer == 1)
+      {
+        d.timeLeft = 2;
+      }
+      else if (games[i].timer == 2)
+      {
+        d.timeLeft = 1;
+      }
+      else if(games[i].timer == 3)
+      {
+        d.timeLeft = 0;
+      }
+
+      d.whatToRead = whatToRead;
+      d.gameFound = false;
+      d.newRound = false;
+      d.scores.scores[0].id = games[i].mainPlayerScore;
+      d.scores.scores[1].id = games[i].opponentPlayerScore;
+
+      int w = write(spectator, &d, sizeof(Server_Data));
+      if(w == -1)
+      {
+        perror("Error sending spectator update\n");
+      }
+    }
+  }
 }
