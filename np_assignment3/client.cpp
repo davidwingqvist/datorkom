@@ -254,15 +254,22 @@ int handle_connection(char* data)
   {
     return 1;
   }
+
+  // To handle protocol and test server
   if(compare.find("HELLO 1") != std::string::npos)
   {
     return 0;
   }
+  if(compare.find("Hello 1") != std::string::npos)
+  {
+    return 0;
+  }
+  
   if(compare.find("OK") != std::string::npos)
   {
     return 3;
   }
-    if(compare.find("ERROR") != std::string::npos)
+  if(compare.find("ERROR") != std::string::npos)
   {
     return -2;
   }
