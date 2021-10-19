@@ -27,6 +27,8 @@
 bool canMakeMove = false;
 bool isSpectator = false;
 
+bool fastFix = false;
+
 void MainMenu();
 void ChooseGameMenu();
 void SearchingForGame();
@@ -320,13 +322,8 @@ int main(int argc, char *argv[])
                     client_state.isSpectator = true;
                   }
                 }
-                else
-                {
-                  // Back to menu.
-                  MainMenu();
-                  client_state.current_state = 0;
-                }
               }
+              
               break;
             case 3:
 
@@ -404,12 +401,18 @@ int main(int argc, char *argv[])
                   break;
                 case 3:
                   std::cout << "You won the Round!\nYour score: " << message.score << "\n";
+                  fastFix = false;
                   break;
                 case 4:
-                  std::cout << "You lost the Round!\n our score: " << message.score << "\n";
+                  std::cout << "You lost the Round!\nYour score: " << message.score << "\n";
+                  fastFix = true;
                 case 5:
+                if(!fastFix)
+                {
                   std::cout << "This round was a TIE!\n";
                   std::cout << "Your score: " << message.score << "\n";
+                }
+                fastFix = !fastFix;
                   break;
                 case 6:
                   // Make a move.
@@ -439,6 +442,7 @@ int main(int argc, char *argv[])
                   break;
                 case 10:
                   client_state.current_state = 2;
+                  std::cout << "Simply press Enter with no other input to return to MainMenu.\n";
                   //print out all games.
                   for (int i = 0; i < 9; i++)
                   {
