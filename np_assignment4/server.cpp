@@ -465,6 +465,8 @@ int main(int argc, char *argv[])
             roundData.playerId = -1;
             roundData.timeLeft = 3;
 
+            UpdateSpectators(games[i].viewerIds, i, 1);
+
             int w = write(games[i].mainPlayerId, &roundData, sizeof(Server_Data));
             if (w == -1)
             {
@@ -814,9 +816,12 @@ void UpdateSpectators(int* spec, const int& i, const int whatToRead)
       d.scores.scores[1].id = games[i].opponentPlayerScore;
 
       int w = write(spectator, &d, sizeof(Server_Data));
-      if(w == -1)
+      if(w == -1 || w == 0)
       {
-        perror("Error sending spectator update\n");
+        // Disconnect the viewer.
+        spec[j] = -1;
+        FD_CLR(spec[j], &current_sockets);
+        close(spectator);
       }
     }
   }
