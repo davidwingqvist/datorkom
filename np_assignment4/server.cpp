@@ -450,7 +450,7 @@ int main(int argc, char *argv[])
 
             //std::cout << "Player: " << p_players[games[i].mainPlayerId].id << " time: " << p_players[games[i].mainPlayerId].time << "\n";
             //std::cout << "Player: " << p_players[games[i].opponentPlayerId].id << " time: " << p_players[games[i].opponentPlayerId].time << "\n";
-            UpdateSpectators(games[i].viewerIds, i, 14);
+            UpdateSpectators(games[i].viewerIds, i, 13);
 
             // Reset game.
             game_data newGame;
