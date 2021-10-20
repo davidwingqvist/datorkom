@@ -289,7 +289,7 @@ int main(int argc, char *argv[])
               }
               else if (strcmp(input, "3") == NULL)
               {
-                client_state.current_state = 1;
+                client_state.current_state = 5;
                 Data dp;
                 dp.wantHighScore = true;
                 dp.wantToJoin = false;
@@ -298,11 +298,6 @@ int main(int argc, char *argv[])
               }
               break;
             case 1:
-              if (strcmp(input, "r") == NULL)
-              {
-                client_state.current_state = 0;
-                MainMenu();
-              }
               break;
             case 2:
               // Spectate game scene.
@@ -386,6 +381,14 @@ int main(int argc, char *argv[])
                 stopSpec.selection = 500;
 
                 write(sockfd, &stopSpec, sizeof(Data));
+              }
+              break;
+            case 5:
+              if (strcmp(input, "r") == NULL)
+              {
+                std::cout << "Returning to Menu...\n";
+                client_state.current_state = 0;
+                MainMenu();
               }
               break;
             }

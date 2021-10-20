@@ -450,7 +450,7 @@ int main(int argc, char *argv[])
 
             //std::cout << "Player: " << p_players[games[i].mainPlayerId].id << " time: " << p_players[games[i].mainPlayerId].time << "\n";
             //std::cout << "Player: " << p_players[games[i].opponentPlayerId].id << " time: " << p_players[games[i].opponentPlayerId].time << "\n";
-            UpdateSpectators(games[i].viewerIds, i, 13);
+            UpdateSpectators(games[i].viewerIds, i, 14);
 
             // Reset game.
             game_data newGame;
@@ -477,7 +477,7 @@ int main(int argc, char *argv[])
             roundData.playerId = -1;
             roundData.timeLeft = 3;
 
-            UpdateSpectators(games[i].viewerIds, i, 11);
+            UpdateSpectators(games[i].viewerIds, i, 14);
 
             int w = write(games[i].mainPlayerId, &roundData, sizeof(Server_Data));
             if (w == -1)
@@ -816,7 +816,11 @@ void UpdateSpectators(int *spec, const int &i, const int whatToRead)
       Server_Data d;
 
       // Dirty countdown.
-      if (games[i].timer == 1)
+      if(games[i].timer == 0)
+      {
+        d.timeLeft = 3;
+      }
+      else if (games[i].timer == 1)
       {
         d.timeLeft = 2;
       }
@@ -824,14 +828,22 @@ void UpdateSpectators(int *spec, const int &i, const int whatToRead)
       {
         d.timeLeft = 1;
       }
-      else if (games[i].timer == 3)
+      else if (games[i].timer >= 3)
       {
         d.timeLeft = 0;
       }
-      else
+
+      if(whatToRead == 14)
+      {
         d.timeLeft = 3;
+      }
+
 
       d.whatToRead = whatToRead;
+      if(whatToRead == 14)
+      {
+        d.whatToRead = 11;
+      }
       d.gameFound = false;
       d.newRound = false;
       d.scores.scores[0].id = games[i].mainPlayerScore;
