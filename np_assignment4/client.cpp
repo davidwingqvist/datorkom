@@ -371,6 +371,7 @@ int main(int argc, char *argv[])
               }
               break;
             case 4:
+             {
               if (strcmp(input, "r") == NULL)
               {
                 client_state.current_state = 0;
@@ -386,8 +387,10 @@ int main(int argc, char *argv[])
                 d.selection = 999;
                 d.playerId = client_state.playerId;
                 write(sockfd, &d, sizeof(Data));
+                ChooseGameMenu();
               }
               break;
+             }
             case 5:
               if (strcmp(input, "r") == NULL)
               {
@@ -466,7 +469,7 @@ int main(int argc, char *argv[])
                 break;
               case 10:
                 client_state.current_state = 2;
-                std::cout << "Simply press 'r' and enter to return to main menu.\n";
+                std::cout << "Simply press [r] and enter to return to main menu.\n";
                 //print out all games.
                 for (int i = 0; i < 9; i++)
                 {
@@ -486,9 +489,16 @@ int main(int argc, char *argv[])
                 std::cout << "Player 2 score: " << message.scores.scores[1].id << "\n";
                 break;
               case 13:
-                MainMenu();
-                client_state.current_state = 0;
+              {
+                Data d;
+                d.wantToSpectate = true;
+                d.selection = 999;
+                d.playerId = client_state.playerId;
+                write(sockfd, &d, sizeof(Data));
+                client_state.current_state = 2;
+                ChooseGameMenu();
                 break;
+              }
               }
             }
             else
