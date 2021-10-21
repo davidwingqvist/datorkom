@@ -14,11 +14,11 @@ client.o: client.cpp
 
 
 client: client.o
-	$(CXX) -L./ -Wall -o client client.o -lncurses
+	$(CXX) -L./ -Wall -o sspgame client.o -lncurses
 
 server: server.o
-	$(CXX) -L./ -Wall -o server server.o -lncurses
+	$(CXX) -L./ -Wall -o sspd server.o -lncurses
 
 
 clean:
-	rm *.o server client
+	rm *.o sspgame sspd
