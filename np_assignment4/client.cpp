@@ -375,12 +375,17 @@ int main(int argc, char *argv[])
               {
                 client_state.current_state = 0;
                 client_state.isSpectator = false;
-                MainMenu();
 
                 Data stopSpec;
                 stopSpec.selection = 500;
 
                 write(sockfd, &stopSpec, sizeof(Data));
+
+                Data d;
+                d.wantToSpectate = true;
+                d.selection = 999;
+                d.playerId = client_state.playerId;
+                write(sockfd, &d, sizeof(Data));
               }
               break;
             case 5:

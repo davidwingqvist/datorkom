@@ -758,10 +758,11 @@ int main(int argc, char *argv[])
                 // Join the game as spectator
                 for (int xl = 0; xl < MAX_VIEWER; xl++)
                 {
-                  if (games[data.selection].viewerIds[xl] == -1)
+                  std::cout << "Spot " << xl << ": " <<  games[data.selection].viewerIds[xl] << "\n";
+                  if (games[data.selection].viewerIds[xl] == -1 || games[data.selection].viewerIds[xl] == 0)
                   {
                     games[data.selection].viewerIds[xl] = i;
-                    std::cout << "Player joined " << data.selection << " as spectator!\n";
+                    std::cout << "Player joined " << data.selection << " as spectator!\n" << "Position: " << xl << "\n";
                     specs[i].isSpectate = 1;
                     break;
                   }
@@ -846,6 +847,8 @@ void UpdateSpectators(int *spec, const int &i, const int whatToRead)
       }
       d.gameFound = false;
       d.newRound = false;
+
+      // Pack the scores somewhere.
       d.scores.scores[0].id = games[i].mainPlayerScore;
       d.scores.scores[1].id = games[i].opponentPlayerScore;
 
