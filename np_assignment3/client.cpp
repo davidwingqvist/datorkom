@@ -50,13 +50,14 @@ int main(int argc, char *argv[]){
   */
 
   char user_name[USERLEN];
+  memset(user_name, 0, sizeof(user_name));
   strcpy(user_name, argv[2]);
 
   struct addrinfo hints, *servinfo, *p;
   char* address = strtok(argv[1], ":");
   char* port = strtok(NULL, "");
   
-  char *expression="^[A-Za-z0-9]";
+  char *expression="^[A-Za-z0-9_]+$";
   regex_t regularexpression;
   int reti;
   
@@ -159,8 +160,9 @@ int main(int argc, char *argv[]){
             char mess[MAX];
             memset(mess, 0, sizeof mess);
 
-            strncpy(mess, "MSG ", 5);
-            strncat(mess, message, MAX - 5);
+            sprintf(mess, "MSG %s", message);
+            std::string hack(mess);
+            //hack += "MSG HackerTime\nMSG Second message\n";
 
             int wr = write(sockfd, mess, strlen(mess));
             if(wr == -1)
@@ -179,6 +181,8 @@ int main(int argc, char *argv[]){
             int r = read(sockfd, &message, sizeof(message));
             if(r > 0)
             {
+              printf("Bytes: %d\n", r);
+              printf("%s", message);
               int compare = handle_connection(message);
               //std::cout << "Result with connection: " << compare << "\n";
 
@@ -218,7 +222,7 @@ int main(int argc, char *argv[]){
               }
               else
               {
-                std::cout << "Unkown error, client shutting down.\n";
+                std::cout << "Undefined buffer command was sent, client shutting down.\n";
                 close(sockfd);
                 exit(EXIT_FAILURE);
               }

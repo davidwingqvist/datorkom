@@ -18,6 +18,7 @@
 #include <string>
 #include <iostream>
 #include <regex.h>
+#include <vector>
 
 // Maximum length of a chat message
 #define MAX 255
@@ -32,48 +33,51 @@ struct package_data
 };
 
 // Global values for ease of use.
-fd_set current_sockets, ready_sockets, handle_sockets;
+fd_set current_sockets, ready_sockets;
 int sockfd;
 struct sockaddr_in cli;
 
-// stored nicknames
-std::string nick_names[FD_SETSIZE] = {"NON"};
+struct client
+{
+  char nickname[USERLEN] = {};
+  bool hasNickname = false;
+  int socket = -1;
+};
 
 // stored statuses, -1 = closed, 0 = starting up, 1 = accepted
-int statuses[FD_SETSIZE] = { -1 };
-
+int statuses[FD_SETSIZE] = {-1};
 
 // Returns -1 on fail, 0 on new connection, 1 on message.
-int handle_connection(char* data);
+int handle_connection(char *data);
 
 int main(int argc, char *argv[])
 {
-	if(argc != 2)
-  	{
-    	printf("No more/less than 1 argument needs to be present. Retry.\n");
-    	exit(0);
-  	}
+  if (argc != 2)
+  {
+    printf("No more/less than 1 argument needs to be present. Retry.\n");
+    exit(0);
+  }
 
-  std::string version_name = "HELLO 1";
+  std::string version_name = "HELLO 1\n";
   char package[PACK];
 
   regex_t regularexpression;
   int reti;
   int matches = 0;
   regmatch_t items;
-  
-  reti=regcomp(&regularexpression, "[A-Za-z0-9]", REG_EXTENDED);
-  if(reti){
+
+  reti = regcomp(&regularexpression, "^[A-Za-z0-9_]+$", REG_EXTENDED);
+  if (reti)
+  {
     fprintf(stderr, "Could not compile regex.\n");
     exit(1);
   }
-  
-  struct addrinfo hints, *servinfo, *p;
-  
 
-  // Divide string into two parts 
-  char* address = strtok(argv[1], ":");
-  char* port = strtok(NULL, "");
+  struct addrinfo hints, *servinfo, *p;
+
+  // Divide string into two parts
+  char *address = strtok(argv[1], ":");
+  char *port = strtok(NULL, "");
   printf("Host %s ", address);
   printf("and port %s\n", port);
 
@@ -81,34 +85,41 @@ int main(int argc, char *argv[])
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_CANONNAME;
-  
+
   int rv;
-  if((rv = getaddrinfo(address, port, &hints, &servinfo)) != 0)
+  if ((rv = getaddrinfo(address, port, &hints, &servinfo)) != 0)
   {
-      perror("Address info");
-      exit(0);
+    perror("Address info");
+    exit(0);
   }
 
-  
-  for(p = servinfo; p != NULL; p = p->ai_next)
+  for (p = servinfo; p != NULL; p = p->ai_next)
   {
-      if((sockfd = socket(p->ai_family, p->ai_socktype,
-                        p->ai_protocol)) == -1)
-      {
-        perror("Listener : Socket");
-        exit(EXIT_FAILURE);
-        continue;
-      }
+    if ((sockfd = socket(p->ai_family, p->ai_socktype,
+                         p->ai_protocol)) == -1)
+    {
+      perror("Listener : Socket");
+      exit(EXIT_FAILURE);
+      continue;
+    }
 
-      if(bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
-      {
-        close(sockfd);
-        perror("Listener : Bind");
-        exit(EXIT_FAILURE);
-        continue;
-      }
+    int enable = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &enable, sizeof(enable));
 
-      break;
+    if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+    {
+      close(sockfd);
+      perror("Listener : Bind");
+      exit(EXIT_FAILURE);
+      continue;
+    }
+
+    break;
+  }
+  if (p == NULL)
+  {
+    printf("Couldn't create socket.\n");
+    exit(EXIT_FAILURE);
   }
 
   FD_ZERO(&current_sockets);
@@ -116,209 +127,208 @@ int main(int argc, char *argv[])
 
   freeaddrinfo(servinfo);
   //int flags = fcntl(connfd, F_GETFL, 0);
-	//fcntl(connfd, F_SETFL, flags | O_NONBLOCK);
+  //fcntl(connfd, F_SETFL, flags | O_NONBLOCK);
 
   socklen_t len = sizeof cli;
   struct itimerval alarmTime;
-  alarmTime.it_interval.tv_sec=10;
-  alarmTime.it_interval.tv_usec=10;
-  alarmTime.it_value.tv_sec=10;
-  alarmTime.it_value.tv_usec=10;
+  alarmTime.it_interval.tv_sec = 10;
+  alarmTime.it_interval.tv_usec = 10;
+  alarmTime.it_value.tv_sec = 10;
+  alarmTime.it_value.tv_usec = 10;
 
   listen(sockfd, 128);
-  
-  while(1)
-  {
-  ready_sockets = current_sockets;
-  handle_sockets = current_sockets;
-  int sel = select(FD_SETSIZE, &ready_sockets, &handle_sockets, NULL, NULL);
 
-  switch (sel)
+  int FD_MAX = sockfd;
+  std::vector<client> clients;
+  while (1)
   {
-    case -1: 
-    std::cout << "Error with connection.\n";
-    exit(EXIT_FAILURE);
+    ready_sockets = current_sockets;
+    int sel = select(FD_MAX + 1, &ready_sockets, NULL, NULL, NULL);
 
-    break;
+    switch (sel)
+    {
+    case -1:
+      std::cout << "Error with connection.\n";
+      exit(EXIT_FAILURE);
+
+      break;
     case 0:
-    // Timeout.
-    //std::cout << "Connection timed out.\n";
+      // Timeout.
+      //std::cout << "Connection timed out.\n";
 
-    break;
+      break;
     default:
 
-    
-    for(int i = 0; i < FD_SETSIZE; i++)
-    {
-      // write sockets.
-      if(FD_ISSET(i, &ready_sockets))
+      for (int i = 0; i < FD_MAX + 1; i++)
       {
-        // A new connection.
-        if(i == sockfd)
+        // write sockets.
+        if (FD_ISSET(i, &ready_sockets))
         {
-          socklen_t len = sizeof(cli);
-          int client_socket = accept(sockfd, (struct sockaddr*)&cli, &len);
-          FD_SET(client_socket, &current_sockets);
-          std::cout << "New connection found.\n";
-
-          char data[MAX];
-          memset(data, 0, sizeof data);
-          
-          std::cout << "Sending over [HELLO 1] to client.\n";
-          strncpy(data, "HELLO 1", MAX);
-          int wr = write(client_socket, &data, strlen(data));
-          if(wr == -1)
+          // A new connection.
+          if (i == sockfd)
           {
-            perror("Write to joined client : ");
-          }
-          statuses[client_socket] = 0;
-        }
-        else
-        {
-          char data[MAX];
-          memset(data, 0, sizeof data);
-          int rd = read(i, &data, sizeof(data));
-          if(rd == 0)
-          {
-            // A 0 return from read means connection has been discontinued.
-            printf("User has disconnected.\n");
-            FD_CLR(i, &current_sockets);
-            statuses[i] = -1;
-            nick_names[i] = "NON";
-            close(i);
-            continue;
-          }
-          int result = handle_connection(data);
-          //std::cout << "Result: " << result << "\n";
+            socklen_t len = sizeof(cli);
+            int client_socket = accept(sockfd, (struct sockaddr *)&cli, &len);
+            FD_SET(client_socket, &current_sockets);
+            std::cout << "New connection found.\n";
 
-          // Handle chat room chat request.
-          if(result == 1 && statuses[i] == 1 && rd > 0)
-          {
-            std::string pack(data);
-            std::string mess = "NON";
-
-            /*
-            if(pack.length() > 0)
-              mess = pack.substr(4, pack.length() - 1);
-
+            char data[MAX];
             memset(data, 0, sizeof data);
+            client c;
+            c.socket = client_socket;
+            clients.push_back(c);
 
-            // Divide it up so we can format it.
-            strcpy(data, "MSG");
-            strcat(data, nick_names[i].c_str());
-            strcat(data, " ");
-            strcat(data, mess.c_str());
-            */
-
-            // Find any packed together messages.
-            int counter = pack.find("MSG", 0);
-            while(counter != std::string::npos)
+            std::cout << "Sending over [HELLO 1] to client.\n";
+            int wr = write(client_socket, version_name.c_str(), version_name.length());
+            if (wr == -1)
             {
-              memset(data, 0, sizeof data);
+              perror("Write to joined client : ");
+            }
+            if (client_socket > FD_MAX)
+            {
+              FD_MAX = client_socket;
+            }
+          }
+          else
+          {
+            char data[1024];
+            memset(data, 0, sizeof data);
+            int rd = read(i, data, sizeof(data));
+            if (rd == 0)
+            {
+              // A 0 return from read means connection has been discontinued.
+              printf("User has disconnected.\n");
+              FD_CLR(i, &current_sockets);
 
-              // Create message data.
-              strcpy(data, "MSG");
-              strcat(data, nick_names[i].c_str());
-              strcat(data, " ");
-
-              std::string sub_message;
-              // Create message.
-              int end = pack.find("MSG", counter + 4);
-              //std::cout << "Counter: " << counter << " End: " << end << "\n";
-              //std::cout << "Test: " << pack.substr(counter, end - counter) << " Size: " << pack.substr(counter, end - counter).length() << "\n";
-              if(end == std::string::npos)
+              // REmove
+              for (int j = 0; j < clients.size(); j++)
               {
-                end = pack.length();
-                sub_message = pack.substr(counter + 4, end);
-              }
-              else
-              {
-                sub_message = pack.substr(counter + 4, end - counter - 4) + "\n";
-              }
-
-              strcat(data, sub_message.c_str());
-
-              // Show chat on server.
-              std::cout << data;
-
-              // Send the package to all clients.
-              for(int j = 0; j < FD_SETSIZE; j++)
-              { 
-                // Write sockets.
-                if(FD_ISSET(j, &handle_sockets) && statuses[j] == 1)
+                if (i == clients[j].socket)
                 {
-                  int wr = write(j, &data, strlen(data));
-                  if(wr == -1)
+                  clients.erase(clients.begin() + j);
+                  break;
+                }
+              }
+              close(i);
+              continue;
+            }
+            char command[50];
+            char nick[12];
+            char message[1024];
+            char buffer[1024];
+
+            std::string stringData(data);
+
+            while (rd > 0)
+            {
+              memset(command, 0, 50);
+              memset(nick, 0, 12);
+              memset(message, 0, 1024);
+              memset(buffer, 0, 1024);
+
+              int s = sscanf(stringData.c_str(), "%s %[^\n]", command, message);
+
+              if (strcmp(command, "MSG") == 0)
+              {
+                int bytesHandled = strlen(command) + strlen(message) + 2;
+                if(bytesHandled > stringData.length())
+                  break;
+                printf("%s %s\n", command, message);
+                stringData = stringData.substr(bytesHandled, rd - bytesHandled);
+
+                printf("Before: %d\n", rd);
+                rd -= bytesHandled;
+                printf("After: %d\n", rd);
+                bool hasnickname = true;
+                for (int j = 0; j < clients.size(); j++)
+                {
+                  if (clients[j].socket == i)
+                  {
+                    if (!clients[j].hasNickname)
+                    {
+                      write(clients[j].socket, "ERROR no nick set\n", strlen("ERROR no nick set\n"));
+                      FD_CLR(i, &ready_sockets);
+                      hasnickname = false;
+                      break;
+                    }
+                    strncpy(nick, clients[j].nickname, 12);
+                    sprintf(buffer, "%s %s %s\n", command, nick, message);
+                    //printf("%s", buffer);
+                    break;
+                  }
+                }
+
+                // NO NICKNAME! DONT SEND MESSAGS
+                if (!hasnickname)
+                {
+                  continue;
+                }
+
+                //std::cout << "Sending: " << buffer << " \n";
+                //std::cout << "CLient size: " << clients.size() << "\n";
+
+                // Send the package to all clients.
+                for (int j = 0; j < clients.size(); j++)
+                {
+                  //std::cout << clients[j].socket << "\n";
+                  int wr = write(clients[j].socket, buffer, strlen(buffer));
+                  if (wr == -1)
                   {
                     perror("Write to client : ");
                   }
                 }
               }
-
-              counter = pack.find("MSG", end);
+              else // If MSG is not present, Then skip onto NICK
+                break;
             }
-
-            // Show chat on server.
-            //std::cout << data;
-
-            /*
-            // Send the package to all clients.
-            for(int j = 0; j < FD_SETSIZE; j++)
+            if (strcmp(command, "NICK") == 0 && rd > 0)
             {
-              // Write sockets.
-              if(FD_ISSET(j, &handle_sockets) && statuses[j] == 1)
+              for (int j = 0; j < clients.size(); j++)
               {
-                int wr = write(j, &data, strlen(data));
-                if(wr == -1)
+                if (i == clients[j].socket)
                 {
-                  perror("Write to client : ");
+                  std::string acceptance;
+                  std::string newName(message);
+                  //std::cout << newName << "\n";
+
+                  if (newName.length() <= 12)
+                  {
+                    reti = regexec(&regularexpression, newName.c_str(), matches, &items, 0);
+                    if (!reti)
+                    {
+                      printf("(Nickname)%s is accepted.\n", newName.c_str());
+                      acceptance = "OK\n";
+                      strncpy(clients[j].nickname, newName.c_str(), 12);
+                      clients[j].hasNickname = true;
+                    }
+                    else
+                    {
+                      printf("(Nickname)%s is NOT accepted.\n", newName.c_str());
+                      acceptance = "ERROR\n";
+                    }
+                  }
+                  else
+                  {
+                    printf("(Nickname)%s is TOO LONG.\n", newName.c_str());
+                    acceptance = "ERROR\n";
+                  }
+
+                  int acc = write(i, acceptance.c_str(), acceptance.length());
+                  if (acc == -1)
+                    perror("Error sending acceptance : ");
                 }
               }
             }
-            */
+            else if(rd > 0)
+            {
+              write(i, "ERROR MALFORMED COMMAND\n", strlen("ERROR MALFORMED COMMAND\n"));
+            }
           }
-          else if (result == -1) // Handle the nickname call.
-          {
-            char acceptance[MAX];
-            memset(acceptance, 0, sizeof acceptance);
-            std::string newName(data);
-            std::cout << newName << "\n";
-            memset(data, 0, sizeof data);
-            newName.erase(0, 4);
-            strcpy(data, newName.c_str());
 
-              if(strlen(data)<=12){
-              reti=regexec(&regularexpression, data, matches, &items,0);
-              if(!reti){
-    	          printf("(Nickname)%s is accepted.\n", data);
-                statuses[i] = 1;
-                nick_names[i] = std::string(data);
-                strcpy(acceptance, "OK\n");
-              } else {
-	              printf("(Nickname)%s is NOT accepted.\n");
-                statuses[i] = 0;
-                nick_names[i] = "NON";
-                strcpy(acceptance, "ERROR\n");
-              }
-              } else {
-                printf("(Nickname)%s is TOO LONG.\n");
-                statuses[i] = 0;
-                nick_names[i] = "NON";
-                strcpy(acceptance, "ERROR\n");
-              }
-
-            int acc = write(i, acceptance, strlen(acceptance));
-            if(acc == -1)
-              perror("Error sending acceptance : ");
-          }
+          FD_CLR(i, &ready_sockets);
         }
       }
-
-      
     }
-
-    //break;
-  }
   }
 
   regfree(&regularexpression);
@@ -326,15 +336,15 @@ int main(int argc, char *argv[])
   return EXIT_SUCCESS;
 }
 
-int handle_connection(char* data)
+int handle_connection(char *data)
 {
   std::string compare(data);
   //std::cout << "String to compare: " << compare << "\n";
-  if(compare.find("MSG") <= 3)
+  if (compare.find("MSG") <= 3)
   {
     return 1;
   }
-  if(compare.find("NICK") <= 3)
+  if (compare.find("NICK") <= 3)
   {
     return -1;
   }
