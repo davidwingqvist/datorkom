@@ -672,6 +672,7 @@ int main(int argc, char *argv[])
               FD_CLR(i, &current_sockets);
               close(i);
               int opponent = games[players[i].gameID].opponentPlayerId;
+              int main = games[players[i].gameID].mainPlayerId;
 
               // Message opponent player that game is over.
               if (opponent > 0)
@@ -682,9 +683,24 @@ int main(int argc, char *argv[])
 
                 write(opponent, &d, sizeof(Server_Data));
               }
+              if(main > 0)
+              {
+                 Server_Data d;
+                d.gameFound = false;
+                d.whatToRead = -2;
+                write(main, &d, sizeof(Server_Data));
+              }
+
+              compressed_game newInfo;
+              games_info[main] = newInfo;
+              games_info[opponent] = newInfo;
+
+              UpdateSpectators(games[main].viewerIds, i, -2);
+              UpdateSpectators(games[opponent].viewerIds, i, -2);
 
               game_data newData;
-              games[i] = newData;
+              games[opponent] = newData;
+              games[main] = newData;
               continue;
             }
             else
@@ -758,11 +774,10 @@ int main(int argc, char *argv[])
                 // Join the game as spectator
                 for (int xl = 0; xl < MAX_VIEWER; xl++)
                 {
-                  std::cout << "Spot " << xl << ": " <<  games[data.selection].viewerIds[xl] << "\n";
                   if (games[data.selection].viewerIds[xl] == -1 || games[data.selection].viewerIds[xl] == 0)
                   {
                     games[data.selection].viewerIds[xl] = i;
-                    std::cout << "Player joined " << data.selection << " as spectator!\n" << "Position: " << xl << "\n";
+                    std::cout << "Player joined " << data.selection << " as spectator!\n";
                     specs[i].isSpectate = 1;
                     break;
                   }
