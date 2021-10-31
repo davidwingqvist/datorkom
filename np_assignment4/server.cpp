@@ -441,9 +441,13 @@ int main(int argc, char *argv[])
             std::cout << "Opponent player " << games[i].opponentPlayerId << ": " << oppp << " milliseconds.\n";
             std::cout << "------------------------------------\n";
             p_players[games[i].mainPlayerId].id = games[i].mainPlayerId;
-            p_players[games[i].mainPlayerId].time = mainp;
             p_players[games[i].opponentPlayerId].id = games[i].opponentPlayerId;
-            p_players[games[i].opponentPlayerId].time = oppp;
+
+            if(p_players[games[i].mainPlayerId].time > mainp)
+              p_players[games[i].mainPlayerId].time = mainp;
+            if(p_players[games[i].opponentPlayerId].time > oppp)
+              p_players[games[i].opponentPlayerId].time = oppp;
+            
             players[games[i].mainPlayerId].isSearching = false;
             players[games[i].opponentPlayerId].isSearching = false;
             games_info[i].active = -1;
@@ -690,6 +694,9 @@ int main(int argc, char *argv[])
                 d.whatToRead = -2;
                 write(main, &d, sizeof(Server_Data));
               }
+
+              player_data newData1;
+              players[i] = newData1;
 
               compressed_game newInfo;
               games_info[main] = newInfo;
