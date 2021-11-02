@@ -371,7 +371,7 @@ int main(int argc, char *argv[])
               }
               break;
             case 4:
-             {
+            {
               if (strcmp(input, "r") == NULL)
               {
                 client_state.current_state = 0;
@@ -390,7 +390,7 @@ int main(int argc, char *argv[])
                 ChooseGameMenu();
               }
               break;
-             }
+            }
             case 5:
               if (strcmp(input, "r") == NULL)
               {
@@ -485,9 +485,37 @@ int main(int argc, char *argv[])
                 std::cout << "Time left for players: " << message.timeLeft << "\n";
                 break;
               case 12:
-                std::cout << "Player 1 score: " << message.scores.scores[0].id << "\n";
-                std::cout << "Player 2 score: " << message.scores.scores[1].id << "\n";
+              {
+                if(message.scores.scores[0].id >= 3)
+                {
+                  std::cout << "Player one WON THE GAME!\n";
+                  std::cout << "Final scores:\nPlayer One: " << message.scores.scores[0].id << "\nPlayer Two: " << message.scores.scores[1].id << "\n";
+                  break;
+                }
+                else if(message.scores.scores[1].id >= 3)
+                {
+                  std::cout << "Player two WON THE GAME!\n";
+                  std::cout << "Final scores:\nPlayer One: " << message.scores.scores[0].id << "\nPlayer Two: " << message.scores.scores[1].id << "\n";
+                  break;
+                }
+
+
+                if (message.scores.scores[0].id > message.scores.scores[1].id)
+                {
+                  std::cout << "Player one is leading over Player two with " << message.scores.scores[0].id << " points.\n";
+                  std::cout << "Player two has " << message.scores.scores[1].id << " points.\n";
+                }
+                else if(message.scores.scores[0].id < message.scores.scores[1].id)
+                {
+                  std::cout << "Player two is leading over Player one with " << message.scores.scores[1].id << " points.\n";
+                  std::cout << "Player one has " << message.scores.scores[0].id << " points.\n";
+                }
+                else
+                {
+                  std::cout << "Both players has the exact same amount of points! Points: " << message.scores.scores[0].id << ".\n";
+                }
                 break;
+              }
               case 13:
               {
                 Data d;

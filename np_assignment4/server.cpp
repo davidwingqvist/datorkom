@@ -778,6 +778,15 @@ int main(int argc, char *argv[])
               }
               else if (data.wantToSpectate && data.isSpectator && data.selection != -1)
               {
+                if(games[data.selection].mainPlayerId == -1 || games[data.selection].opponentPlayerId == -1)
+                {
+                  std::cout << "Player tried to join already closed game.\n";
+                  Server_Data sd;
+                  sd.whatToRead = 10;
+
+                  write(i, &sd, sizeof(Server_Data));
+                  continue;
+                }
                 // Join the game as spectator
                 for (int xl = 0; xl < MAX_VIEWER; xl++)
                 {
