@@ -730,7 +730,9 @@ int main(int argc, char *argv[])
                 _player temp[1024];
                 for (int ik = 0; ik < 1024; ik++)
                 {
-                  temp[ik] = p_players[ik];
+                  // Cygwin fix
+                  if(p_players[ik].id != 0)
+                    temp[ik] = p_players[ik];
                 }
                 std::sort(temp, temp + 1024, compare);
                 for (int ij = 0; ij < 5; ij++)
