@@ -81,6 +81,12 @@ int main(int argc, char *argv[])
   printf("Host %s ", address);
   printf("and port %s\n", port);
 
+  if(!port)
+  {
+    printf("No port was input, remember that you need to input IP:PORT\n");
+    return EXIT_FAILURE;
+  }
+
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
