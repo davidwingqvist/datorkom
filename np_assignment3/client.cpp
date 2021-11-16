@@ -181,8 +181,8 @@ int main(int argc, char *argv[]){
             int r = read(sockfd, &message, sizeof(message));
             if(r > 0)
             {
-              printf("Bytes: %d\n", r);
-              printf("%s", message);
+              //printf("Bytes: %d\n", r);
+              //printf("%s", message);
               int compare = handle_connection(message);
               //std::cout << "Result with connection: " << compare << "\n";
 

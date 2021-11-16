@@ -233,12 +233,12 @@ int main(int argc, char *argv[])
                 int bytesHandled = strlen(command) + strlen(message) + 2;
                 if(bytesHandled > stringData.length())
                   break;
-                printf("%s %s\n", command, message);
+                //printf("%s %s\n", command, message);
                 stringData = stringData.substr(bytesHandled, rd - bytesHandled);
 
-                printf("Before: %d\n", rd);
+                //printf("Before: %d\n", rd);
                 rd -= bytesHandled;
-                printf("After: %d\n", rd);
+                //printf("After: %d\n", rd);
                 bool hasnickname = true;
                 for (int j = 0; j < clients.size(); j++)
                 {
