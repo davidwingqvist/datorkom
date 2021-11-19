@@ -16,7 +16,11 @@
 #include <string>
 #include <regex.h>
 
-#define MAX 255
+/*
+  The reason why max is 257 is to account for the newline \n and the end of string 0\ character which gets included.
+  This limits the message to 255 characters for the user which is what the assignment says!
+*/
+#define MAX 257
 #define USERLEN 13
 #define STDIN 0
 
@@ -157,13 +161,14 @@ int main(int argc, char *argv[]){
             memset(message, 0 , sizeof message); 
             fgets(message, MAX, stdin);
 
-            char mess[MAX];
+            // +5 is to account for any extra characters that gets included automatically.
+            // Mainly the MSG and space character at the sprintf below.
+            char mess[MAX + 5];
             memset(mess, 0, sizeof mess);
 
             sprintf(mess, "MSG %s", message);
             std::string hack(mess);
-            //hack += "MSG HackerTime\nMSG Second message\n";
-
+            
             int wr = write(sockfd, mess, strlen(mess));
             if(wr == -1)
             {
@@ -175,7 +180,7 @@ int main(int argc, char *argv[]){
           // Read for messages.
           else if(i == sockfd)
           {
-            char message[MAX];
+            char message[MAX + USERLEN + 8];
             memset(message, 0, sizeof message);
 
             int r = read(sockfd, &message, sizeof(message));
@@ -211,7 +216,7 @@ int main(int argc, char *argv[]){
               }
               else if(compare == -2)
               {
-                std::cout << "Error, not accepted nickname\n";
+                std::cout << "ERROR buffer was too big. Shutting down client.\n";
                 close(sockfd);
                 exit(EXIT_FAILURE);
               }
