@@ -21,7 +21,7 @@
 #include <vector>
 
 // Maximum length of a chat message
-#define MAX 255
+#define MAX 257
 #define USERLEN 13
 #define PACK MAX + USERLEN + 5
 
@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
   printf("Host %s ", address);
   printf("and port %s\n", port);
 
-  if(!port)
+  if (!port)
   {
     printf("No port was input, remember that you need to input IP:PORT\n");
     return EXIT_FAILURE;
@@ -219,7 +219,7 @@ int main(int argc, char *argv[])
               continue;
             }
             char command[50];
-            char nick[12];
+            char nick[14];
             char message[1024];
             char buffer[1024];
 
@@ -228,7 +228,7 @@ int main(int argc, char *argv[])
             while (rd > 0)
             {
               memset(command, 0, 50);
-              memset(nick, 0, 12);
+              memset(nick, 0, 14);
               memset(message, 0, 1024);
               memset(buffer, 0, 1024);
 
@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
               if (strcmp(command, "MSG") == 0)
               {
                 int bytesHandled = strlen(command) + strlen(message) + 2;
-                if(bytesHandled > stringData.length())
+                if (bytesHandled > stringData.length())
                   break;
                 //printf("%s %s\n", command, message);
                 stringData = stringData.substr(bytesHandled, rd - bytesHandled);
@@ -276,7 +276,6 @@ int main(int argc, char *argv[])
                 // Send the package to all clients.
                 for (int j = 0; j < clients.size(); j++)
                 {
-                  //std::cout << clients[j].socket << "\n";
                   int wr = write(clients[j].socket, buffer, strlen(buffer));
                   if (wr == -1)
                   {
@@ -325,7 +324,7 @@ int main(int argc, char *argv[])
                 }
               }
             }
-            else if(rd > 0)
+            else if (rd > 0)
             {
               write(i, "ERROR MALFORMED COMMAND\n", strlen("ERROR MALFORMED COMMAND\n"));
             }

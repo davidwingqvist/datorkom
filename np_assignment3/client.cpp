@@ -167,7 +167,7 @@ int main(int argc, char *argv[]){
             memset(mess, 0, sizeof mess);
 
             sprintf(mess, "MSG %s", message);
-            std::string hack(mess);
+            //std::string hack(mess);
             
             int wr = write(sockfd, mess, strlen(mess));
             if(wr == -1)
