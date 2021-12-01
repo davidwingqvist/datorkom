@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <vector>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <regex.h>
 
@@ -20,7 +21,7 @@
   The reason why max is 257 is to account for the newline \n and the end of string 0\ character which gets included.
   This limits the message to 255 characters for the user which is what the assignment says!
 */
-#define MAX 257
+#define MAX 258
 #define USERLEN 13
 #define STDIN 0
 
@@ -168,6 +169,9 @@ int main(int argc, char *argv[]){
 
             sprintf(mess, "MSG %s", message);
             //std::string hack(mess);
+
+            if(strlen(message) <= 256)
+            {
             
             int wr = write(sockfd, mess, strlen(mess));
             if(wr == -1)
@@ -176,74 +180,90 @@ int main(int argc, char *argv[]){
               close(sockfd);
               exit(EXIT_FAILURE);
             }
+            }
+            else
+            {
+              std::cout << "Message was too big > 255. Not sent.\n";
+            }
           }
           // Read for messages.
           else if(i == sockfd)
           {
-            char message[MAX + USERLEN + 8];
-            memset(message, 0, sizeof message);
-
-            int r = read(sockfd, &message, sizeof(message));
-            if(r > 0)
+            char data[1024];
+            memset(data, 0, sizeof data);
+            int rd = read(sockfd, data, sizeof(data));
+            if(rd > 0)
             {
-              //printf("Bytes: %d\n", r);
-              //printf("%s", message);
-              int compare = handle_connection(message);
-              //std::cout << "Result with connection: " << compare << "\n";
+              char command[50];
+              char nick[14];
+              char message[1024];
+              char buffer[1024];
+              std::string stringData(data);
+              //std::cout << stringData;
+              while (rd > 0)
+              {
+                memset(command, 0, 50);
+                memset(nick, 0, 14);
+                memset(message, 0, 1024);
+                memset(buffer, 0, 1024);
 
-              if(compare == 1 && strlen(message) > 0)
-              {
-                std::string output = message;
-                output.erase(0, 4);
+                int s = sscanf(stringData.c_str(), "%s %s %[^\n]", command, nick, message);
+                //std::cout << "Command: " << command << "\n" << "Nick: " << nick << "\n" << "Message: " << message << "\n";
 
-                // No echoing back our message.
-                output.find(user_name);
-                if((output.find(user_name)) >= strlen(user_name))
-                  std::cout << output;
-              }
-              // Allow on client side to send messages.
-              else if(compare == 0)
-              {
-                // send over nickname.
-                char name_pack[MAX];
-                memset(name_pack, 0, sizeof name_pack);
-                strcpy(name_pack, "NICK ");
-                strcat(name_pack, user_name);
+                if (strcmp(command, "MSG") == 0)
+                {
+                  if(strlen(message) == 0 || strcmp(nick, "MSG") == 0)
+                  {
+                    // Faulty message was sent to client, break loop here.
+                    break;
+                  }
 
-                int snd = write(sockfd, name_pack, strlen(name_pack));
-                if(snd == -1)
-                  perror("Error sending nickname : ");
-              }
-              else if(compare == -2)
-              {
-                std::cout << "ERROR buffer was too big. Shutting down client.\n";
-                close(sockfd);
-                exit(EXIT_FAILURE);
-              }
-              else if (compare == 3)
-              {
-                std::cout << "[SERVER] Connection has been accepted. Welcome to the chat room!\n";
-                accepted = true;
-              }
-              else
-              {
-                std::cout << "Undefined buffer command was sent, client shutting down.\n";
-                close(sockfd);
-                exit(EXIT_FAILURE);
+                  // Display to client only if nickname isnt the same as local and message actually is something.
+                  if(strcmp(nick, user_name) != 0 && strlen(message) > 0)
+                    printf("%s: %s\n", nick, message);
+                }
+                else if(strcmp(command, "HELLO") == 0 && strcmp(nick, "1") == 0)
+                {
+                  memset(buffer, 0, sizeof(buffer));
+                  strcpy(buffer, "NICK ");
+                  strcat(buffer, user_name);
+                  strcat(buffer, "\n");
+                  int w = write(sockfd, buffer, strlen(buffer));
+                  if(w <= 0)
+                  {
+                    std::cout << "Error with writing nickname\n";
+                  }
+                  break;
+                }
+                else if(strcmp(command, "OK") == 0)
+                {
+                  accepted = true;
+                  break;
+                }
+                else
+                {
+                  // End of command list start listening for next package.
+                  break;
+                }
+
+                int bytesHandled = strlen(command) + strlen(message) + strlen(nick) + 3;
+                if (bytesHandled > stringData.length())
+                  break;
+
+                stringData = stringData.substr(bytesHandled, rd - bytesHandled);
+                rd -= bytesHandled;
               }
             }
-            else
+            else if(rd == 0)
             {
-              // Disconnect.
-              memset(message, 0, strlen(message));
               std::cout << "Server shutdown.\n";
+              regfree(&regularexpression);
               close(sockfd);
-              exit(EXIT_SUCCESS);
+              return EXIT_SUCCESS;
             }
           }
         }
       }
-
       break;
     }
 	  

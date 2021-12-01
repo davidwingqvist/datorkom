@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
     }
 
     int enable = 1;
-    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &enable, sizeof(enable));
+    //setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &enable, sizeof(enable));
 
     if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1)
     {
@@ -294,7 +294,6 @@ int main(int argc, char *argv[])
                 {
                   std::string acceptance;
                   std::string newName(message);
-                  //std::cout << newName << "\n";
 
                   if (newName.length() <= 12)
                   {
