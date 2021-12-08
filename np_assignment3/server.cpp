@@ -272,14 +272,18 @@ int main(int argc, char *argv[])
 
                 //std::cout << "Sending: " << buffer << " \n";
                 //std::cout << "CLient size: " << clients.size() << "\n";
-
+                
                 // Send the package to all clients.
                 for (int j = 0; j < clients.size(); j++)
                 {
-                  int wr = write(clients[j].socket, buffer, strlen(buffer));
-                  if (wr == -1)
+                  // Dont send any packages to any clients with no nicknames.
+                  if(clients[j].hasNickname)
                   {
-                    perror("Write to client : ");
+                    int wr = write(clients[j].socket, buffer, strlen(buffer));
+                    if (wr == -1)
+                    {
+                      perror("Write to client : ");
+                    }
                   }
                 }
               }
